@@ -26,12 +26,15 @@
     </form>
     <ul id="suggest" class="suggest" role="listbox" hidden></ul>
     <p id="inputError" class="input-error" hidden></p>
+    <div id="watchBar" class="watch-bar"></div>
+    <div id="watchPanel" class="watch-panel" hidden></div>
   </header>
 
   <main>
     <section id="welcome" class="welcome">
       <p>輸入上市股票代號，查看盤後技術面狀態。</p>
       <p class="muted">只使用收盤後資料：每天下午三點後才會出現當天的資料。</p>
+      <p class="muted">查到股票後按「☆ 加入自選」，下次點搜尋框下方的「自選1」「自選2」就能直接調出。</p>
     </section>
 
     <section id="status" class="status" hidden role="status" aria-live="polite"></section>
@@ -43,6 +46,7 @@
             <span id="stockName" class="stock-name"></span>
             <span id="stockCode" class="stock-code"></span>
             <span class="tag">上市</span>
+            <div><button type="button" id="watchBtn" class="watch-btn" aria-pressed="false">☆ 加入自選</button></div>
           </div>
           <div class="price-box">
             <div id="close" class="close"></div>
@@ -105,7 +109,17 @@
       <h3 id="termTitle"></h3>
       <p id="termWhat"></p>
       <p class="term-how"><b>怎麼看：</b><span id="termHow"></span></p>
+      <p class="term-rule" hidden><b>本 App 怎麼判斷：</b><span id="termRule"></span></p>
       <button id="termClose" type="button">知道了</button>
+    </div>
+  </div>
+
+  <div id="watchSheet" class="sheet" hidden role="dialog" aria-modal="true" aria-label="加入自選">
+    <div class="sheet-body">
+      <h3>加入自選</h3>
+      <p class="muted">可以同時加入兩組。再點一次就移除。</p>
+      <div id="watchChoices" class="watch-choices"></div>
+      <button id="watchSheetClose" type="button">完成</button>
     </div>
   </div>
 
@@ -116,7 +130,7 @@
     </div>
     <div id="fullLegend" class="full-legend"></div>
     <div id="fullChart" class="full-chart"></div>
-    <p class="full-tip">可用手指拖曳、兩指縮放。紅 K 代表收盤比開盤高，綠 K 代表收盤比開盤低。</p>
+    <p class="full-tip"><b>點一下 K 棒</b>，上方就會顯示那一天的價格、漲跌和均線；手指左右滑動可以看更早的日子，兩指可以縮放。紅 K：收盤比開盤高；綠 K：收盤比開盤低。</p>
     <div class="disclaimer">僅供參考，不構成投資建議</div>
   </div>
 

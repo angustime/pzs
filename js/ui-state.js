@@ -6,13 +6,18 @@ import { shortDateLabel } from './dates.js';
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const termBtn = (t) => (GLOSSARY[t] ? `<button type="button" class="term" data-term="${esc(t)}">${esc(t)}<span aria-hidden="true">?</span></button>` : '');
 
-// 狀態頁卡片：有 chart 的會在卡片上方放一張最近 60 天的小圖，文字寫在圖下
+// 技術指標卡片：成交量、KD、RSI、MACD 放在同一張卡片，點上方分頁切換
+export const IND_TABS = [
+  { type: 'volume', label: '成交量', legend: [['紅綠柱', '每天成交量（張）'], ['#e0a106', '20 日均量']] },
+  { type: 'kd', label: 'KD', legend: [['#e0a106', 'K 值'], ['#2f80c9', 'D 值'], ['虛線', '80／20']] },
+  { type: 'rsi', label: 'RSI', legend: [['#7b5cd6', 'RSI'], ['虛線', '70／30']] },
+  { type: 'macd', label: 'MACD', legend: [['紅綠柱', '柱狀體'], ['#e0a106', 'DIF'], ['#2f80c9', '訊號線']] },
+];
+
+// 狀態頁卡片順序
 export const CARDS = [
   { key: 'trend', title: '趨勢' },
-  { key: 'volume', title: '成交量', chart: 'volume', legend: [['紅綠柱', '每天成交量（張）'], ['#e0a106', '20 日均量']] },
-  { key: 'kd', title: 'KD', chart: 'kd', legend: [['#e0a106', 'K 值'], ['#2f80c9', 'D 值'], ['虛線', '80／20']] },
-  { key: 'rsi', title: 'RSI', chart: 'rsi', legend: [['#7b5cd6', 'RSI'], ['虛線', '70／30']] },
-  { key: 'macd', title: 'MACD', chart: 'macd', legend: [['紅綠柱', '柱狀體'], ['#e0a106', 'DIF'], ['#2f80c9', '訊號線']] },
+  { key: 'ind', title: '技術指標', indicators: true },
   { key: 'inst', title: '法人與融資' },
   { key: 'watch', title: '要留意' },
 ];
@@ -27,8 +32,19 @@ export function renderVerdict(container, result) {
       .map((s) => `<li><span>${esc(s.name)}：${esc(s.reason)}</span><b>${s.score > 0 ? '+' : s.score < 0 ? '−' : ''}${Math.abs(s.score)}</b></li>`)
       .join('')}</ul></div>`;
   };
-  container.className = `card verdict ${v.level}`;
-  container.innerHTML = `
+  const p = result.pattern;
+  const patternHtml = p ? `
+    <div class="pattern tone-${p.tone}">
+      <div class="pattern-head">
+        <span class="verdict-label">目前型態</span>
+        <span class="pattern-name">${esc(p.name)}</span>
+        ${termBtn(p.name)}
+      </div>
+      <p class="pattern-text">${esc(p.text)}</p>
+      ${p.tags.length ? `<div class="pattern-tags">${p.tags.map((t) => `<span class="ptag">${termBtn(t.name)}<small>${esc(t.text)}</small></span>`).join('')}</div>` : ''}
+    </div>` : '';
+  container.className = `card verdict ${v.level}${v.strong ? ' strong' : ''}`;
+  container.innerHTML = `${patternHtml}
     <div class="verdict-head">
       <span class="verdict-label">技術面</span>
       <span class="verdict-level">${esc(v.label)}</span>
@@ -51,25 +67,46 @@ const legendHtml = (legend) => legend.map(([c, label]) => {
   return `<span>${swatch}${esc(label)}</span>`;
 }).join('');
 
-// 卡片骨架（每檔股票建一次，小圖畫在 .ind-chart 裡；之後只更新文字，圖不用重畫）
+// 某個指標目前偏哪邊：有偏多沒偏空 → up，反之 → down，其餘 → neutral（分頁上的小圓點）
+function toneOf(items) {
+  const up = items.some((x) => x.tone === 'up'), down = items.some((x) => x.tone === 'down');
+  return up && !down ? 'up' : down && !up ? 'down' : 'neutral';
+}
+
+// 卡片骨架（每檔股票建一次；指標小圖由 main.js 畫在 .ind-chart 裡）
 export function buildCards(container) {
   container.innerHTML = CARDS.map((c) => `<section class="card state-card" data-card="${c.key}">
       <h3>${c.title}</h3>
-      ${c.chart ? `<div class="ind-legend">${legendHtml(c.legend)}</div><div class="ind-chart" data-chart="${c.chart}"></div>` : ''}
+      ${c.indicators ? `<div class="ind-tabs" role="tablist">${IND_TABS.map((t) => `<button type="button" role="tab" data-ind="${t.type}"><i class="dot"></i>${t.label}</button>`).join('')}</div>
+      <div class="ind-legend"></div><div class="ind-chart"></div>` : ''}
       <ul class="state-list"></ul>
       <div class="terms"></div>
     </section>`).join('');
 }
 
-export function updateCards(container, result) {
+const emptyText = (key) => (key === 'watch' ? '今天沒有特別需要留意的狀況。' : '資料不足，暫時無法判斷。');
+
+function fillList(sec, items, key) {
+  if (!items.length) items = [{ text: emptyText(key), terms: [], tone: 'neutral' }];
+  sec.querySelector('.state-list').innerHTML = items.map((it) => `<li class="tone-${it.tone}">${esc(it.text)}</li>`).join('');
+  const terms = [...new Set(items.flatMap((it) => it.terms))];
+  sec.querySelector('.terms').innerHTML = terms.map(termBtn).join('');
+}
+
+// 更新卡片文字；indType 是技術指標卡片目前選的分頁
+export function updateCards(container, result, indType) {
   for (const c of CARDS) {
     const sec = container.querySelector(`[data-card="${c.key}"]`);
     if (!sec) continue;
-    let items = result.cards[c.key] || [];
-    if (!items.length) items = [{ text: c.key === 'watch' ? '今天沒有特別需要留意的狀況。' : '資料不足，暫時無法判斷。', terms: [], tone: 'neutral' }];
-    sec.querySelector('.state-list').innerHTML = items.map((it) => `<li class="tone-${it.tone}">${esc(it.text)}</li>`).join('');
-    const terms = [...new Set(items.flatMap((it) => it.terms))];
-    sec.querySelector('.terms').innerHTML = terms.map(termBtn).join('');
+    if (!c.indicators) { fillList(sec, result.cards[c.key] || [], c.key); continue; }
+    const tab = IND_TABS.find((t) => t.type === indType) || IND_TABS[0];
+    sec.querySelectorAll('[data-ind]').forEach((b) => {
+      const t = b.dataset.ind;
+      b.setAttribute('aria-selected', String(t === tab.type));
+      b.querySelector('.dot').className = `dot ${toneOf(result.cards[t] || [])}`;
+    });
+    sec.querySelector('.ind-legend').innerHTML = legendHtml(tab.legend);
+    fillList(sec, result.cards[tab.type] || [], tab.type);
   }
 }
 
@@ -113,6 +150,7 @@ export function setupGlossary(sheet) {
   const title = sheet.querySelector('#termTitle');
   const what = sheet.querySelector('#termWhat');
   const how = sheet.querySelector('#termHow');
+  const rule = sheet.querySelector('#termRule');
   const close = () => { sheet.hidden = true; };
   document.addEventListener('click', (e) => {
     const b = e.target.closest('button.term');
@@ -122,6 +160,8 @@ export function setupGlossary(sheet) {
       title.textContent = b.dataset.term;
       what.textContent = g.what;
       how.textContent = g.how;
+      rule.parentElement.hidden = !g.rule;
+      rule.textContent = g.rule || '';
       sheet.hidden = false;
       return;
     }

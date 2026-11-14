@@ -165,7 +165,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   padding: calc(env(safe-area-inset-top) + 10px) 16px 10px; background: var(--brand); color: #fff; font-weight: 600;
 }
 .full-head button { background: rgba(255,255,255,0.15); color: #fff; border: 0; border-radius: 16px; padding: 4px 14px; font-weight: 400; }
-.full-legend { padding: 6px 16px; font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; min-height: 3.2em; background: var(--surface-2); }
+.full-legend { padding: 6px 16px; font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; min-height: 4.8em; background: var(--surface-2); line-height: 1.6; }
 .full-legend b { font-weight: 600; }
 .full-chart { flex: 1; min-height: 0; }
 .full-tip { margin: 0; padding: 6px 16px 0; font-size: 12px; color: var(--text-2); }
@@ -294,3 +294,63 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .day-grid .term-mini span { width: 13px; height: 13px; font-size: 9px; background: var(--text-2); opacity: 0.6; }
 .ex-tag { margin-top: 4px; font-size: 12px; }
 .ex-tag[hidden] { display: none; }
+
+/* ---- 目前型態 ---- */
+.pattern { padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px dashed var(--border); }
+.pattern-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pattern-name { font-size: 22px; font-weight: 700; color: var(--accent); }
+.pattern.tone-up .pattern-name { color: var(--up); }
+.pattern.tone-down .pattern-name { color: var(--down); }
+.pattern-text { margin: 6px 0 0; font-size: 14px; color: var(--text); }
+.pattern-tags { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.ptag { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.ptag small { color: var(--text-2); font-size: 13px; }
+.verdict.strong .verdict-level { text-decoration: underline; text-underline-offset: 5px; }
+.term-rule { background: var(--warn-bg); color: var(--warn-text); border-radius: 10px; padding: 10px 12px; }
+.term-rule[hidden] { display: none; }
+
+/* ---- 技術指標卡片的分頁 ---- */
+.ind-tabs { display: flex; gap: 4px; padding: 3px; margin: 0 0 8px; background: var(--surface-2); border-radius: 10px; }
+.ind-tabs button {
+  flex: 1; border: 0; background: none; padding: 6px 0; border-radius: 8px; font-size: 14px; color: var(--text-2);
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+}
+.ind-tabs button[aria-selected=true] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+.ind-tabs .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-2); opacity: 0.5; }
+.ind-tabs .dot.up { background: var(--up); opacity: 1; }
+.ind-tabs .dot.down { background: var(--down); opacity: 1; }
+
+/* ---- 自選 ---- */
+.watch-bar { display: flex; gap: 8px; margin-top: 10px; }
+.watch-tab {
+  border: 1px solid rgba(255,255,255,0.35); background: rgba(255,255,255,0.12); color: #fff;
+  border-radius: 16px; padding: 4px 14px; font-size: 14px; white-space: nowrap;
+}
+.watch-tab small { opacity: 0.75; }
+.watch-tab.open { background: var(--gold); border-color: var(--gold); color: #3b2500; font-weight: 600; }
+.watch-panel {
+  position: absolute; left: 14px; right: 14px; margin-top: 6px; z-index: 9; max-height: 65vh; overflow-y: auto;
+  background: var(--surface); color: var(--text); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+}
+.watch-panel[hidden] { display: none; }
+.watch-panel-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 14px; }
+.watch-panel-head button { margin-left: 6px; border: 1px solid var(--border); background: var(--surface-2); border-radius: 12px; padding: 2px 12px; font-size: 13px; color: var(--accent); }
+.watch-panel ul { list-style: none; margin: 0; padding: 4px; }
+.watch-panel li { display: flex; align-items: center; border-radius: 8px; }
+.watch-panel li.current { background: var(--brand-soft); }
+.watch-panel li.empty { padding: 14px; color: var(--text-2); font-size: 14px; }
+.watch-item { flex: 1; text-align: left; border: 0; background: none; padding: 10px; display: flex; gap: 12px; font-size: 15px; color: var(--text); }
+.watch-item b { color: var(--accent); min-width: 4.5em; font-variant-numeric: tabular-nums; font-weight: 600; }
+.watch-edit { display: flex; gap: 4px; padding-right: 6px; }
+.watch-edit button { border: 1px solid var(--border); background: var(--surface-2); border-radius: 8px; min-width: 34px; padding: 4px 6px; font-size: 14px; }
+.watch-edit button:disabled { opacity: 0.3; }
+.watch-edit button.danger { color: var(--err-text); font-size: 13px; }
+.watch-choices { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 14px; }
+.watch-choice { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); font-size: 16px; color: var(--text); }
+.watch-choice.on { border-color: var(--gold); background: var(--warn-bg); font-weight: 600; }
+.watch-choice small { color: var(--text-2); }
+.watch-btn {
+  margin-top: 6px; border: 1px solid var(--gold-text); background: none; color: var(--gold-text);
+  border-radius: 14px; padding: 2px 10px; font-size: 13px;
+}
+.watch-btn.on { background: var(--gold); border-color: var(--gold); color: #3b2500; font-weight: 600; }

@@ -93,6 +93,24 @@ export const RULES = {
   },
   rsiBull: 55,
   rsiBear: 45,
+  verdictStrongBull: 6,   // 總分 ≥ 6 明顯偏多
   verdictBull: 3,         // 總分 ≥ 3 偏多
   verdictBear: -3,        // 總分 ≤ −3 偏空
+  verdictStrongBear: -6,  // 總分 ≤ −6 明顯偏空
+
+  // ---- 目前型態（多頭排列、高檔盤整…） ----
+  pattern: {
+    maFast: 5,            // 5 日線
+    slopeDays: 5,         // 均線方向：跟幾天前比
+    rangeDays: 20,        // 「整理區間」看最近幾天
+    rangeNarrowPct: 10,   // 近 20 日高低差 < 10% 算盤整
+    flatSlopePct: 2,      // 月線 20 天內變動 < 2% 算走平（突破／跌破要先有「整理」）
+    positionDays: 60,     // 高檔／低檔看近 60 日區間
+    highZonePos: 70,      // 位在區間 70% 以上 = 高檔
+    lowZonePos: 30,       // 位在區間 30% 以下 = 低檔
+    pullbackPct: 5,       // 上升趨勢中，比近 20 日高點回落 ≥ 5% = 回檔
+    reboundPct: 5,        // 下降趨勢中，比近 20 日低點彈起 ≥ 5% = 反彈
+    deepDropPct: 20,      // 比近 60 日高點跌 ≥ 20% = 跌深
+    bigRisePct: 30,       // 比近 60 日低點漲 ≥ 30% = 漲多
+  },
 };

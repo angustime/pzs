@@ -10,13 +10,14 @@ import { evaluate } from './rules.js';
 import { renderMore } from './links.js';
 import { refOf } from './price.js';
 import { initStockList, setupSearch, nameOf } from './search.js';
+import { setupWatchUI } from './watch-ui.js';
 import { renderVerdict, buildCards, updateCards, renderChipsTable, renderMarginTable, setupGlossary } from './ui-state.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
   form: $('searchForm'), input: $('codeInput'), inputError: $('inputError'),
   welcome: $('welcome'), status: $('status'), stock: $('stock'),
-  exRightTag: $('exRightTag'),
+  exRightTag: $('exRightTag'), watchBar: $('watchBar'), watchBtn: $('watchBtn'),
   name: $('stockName'), code: $('stockCode'), close: $('close'), change: $('change'),
   asOf: $('asOf'), stale: $('staleWarn'),
   previewBox: $('previewBox'), previewChart: $('previewChart'), trendChart: $('trendChart'), trendDays: $('trendDays'),
@@ -29,6 +30,8 @@ const el = {
 let current = null;       // 目前顯示的 { code, name, rows }
 let fullChart = null;
 let panelCharts = {};     // 分頁裡的圖：切到該分頁時才畫（隱藏中的元素量不到寬度）
+let indType = 'volume';   // 技術指標卡片目前的分頁
+let lastResult = null;
 let cardsFor = null;      // 卡片骨架與指標小圖是為哪一筆資料建的
 let chipsStatus = { ready: false, message: null, error: null };
 let queryToken = 0;       // 避免連按兩次查詢時舊結果蓋掉新結果
@@ -89,6 +92,14 @@ async function loadChips(token) {
   renderAnalysis();
 }
 
+// 技術指標卡片的小圖：換分頁時重畫
+function renderIndChart() {
+  const node = el.stateCards.querySelector('.ind-chart');
+  if (!node || !current) return;
+  if (panelCharts.ind) panelCharts.ind.remove();
+  panelCharts.ind = renderIndicator(node, current.rows, indType);
+}
+
 // 重新判定並畫出狀態頁、法人、融資券
 function renderAnalysis(full = true) {
   if (!current) return;
@@ -98,12 +109,11 @@ function renderAnalysis(full = true) {
   else if (!el.verdict.innerHTML) renderVerdict(el.verdict, result);
   if (cardsFor !== current) {
     buildCards(el.stateCards);
-    el.stateCards.querySelectorAll('.ind-chart').forEach((node) => {
-      panelCharts['ind:' + node.dataset.chart] = renderIndicator(node, current.rows, node.dataset.chart);
-    });
     cardsFor = current;
+    renderIndChart();
   }
-  updateCards(el.stateCards, result);
+  lastResult = result;
+  updateCards(el.stateCards, result, indType);
   renderChipsTable(el.chipsPanel, chips, chipsStatus);
   renderMarginTable(el.marginPanel, chips, chipsStatus);
 }
@@ -137,6 +147,7 @@ function render(res) {
   el.stock.hidden = false;
   renderDayGrid(last, ref);
   renderMore(el.morePanel, current.code, res.name || current.code);
+  watchUI.refresh();
   for (const c of Object.values(panelCharts)) c.remove();
   panelCharts = {};
   cardsFor = null;
@@ -186,6 +197,11 @@ function closeFull(fromPopstate = false) {
 
 // ---- 事件 ----
 initStockList();
+// 自選名單（點自選股 = 一般查詢，會補抓最新資料）
+const watchUI = setupWatchUI(
+  { bar: el.watchBar, panel: $('watchPanel'), sheet: $('watchSheet'), choices: $('watchChoices'), sheetClose: $('watchSheetClose'), starBtn: el.watchBtn },
+  { onPick: (code) => { el.input.value = code; query(code); }, getCurrent: () => current },
+);
 setupSearch({ input: el.input, list: $('suggest'), form: el.form, error: el.inputError }, query);
 document.querySelector('.tabs').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-tab]');
@@ -193,6 +209,13 @@ document.querySelector('.tabs').addEventListener('click', (e) => {
   selectTab(b.dataset.tab);
 });
 el.previewBox.addEventListener('click', openFull);
+el.stateCards.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-ind]');
+  if (!b || b.dataset.ind === indType) return;
+  indType = b.dataset.ind;
+  renderIndChart();
+  if (lastResult) updateCards(el.stateCards, lastResult, indType);
+});
 el.closeFull.addEventListener('click', () => closeFull());
 window.addEventListener('popstate', () => closeFull(true));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeFull(); });

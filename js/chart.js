@@ -4,6 +4,8 @@
 import { createChart, CrosshairMode } from '../vendor/lightweight-charts.mjs';
 import { CONFIG, RULES } from './config.js';
 import { sma, kd as calcKd, rsi as calcRsi, macd as calcMacd } from './indicators.js';
+import { refOf } from './price.js';
+import { shortDateLabel } from './dates.js';
 
 const MA_COLORS = { 5: '#e0a106', 20: '#7b5cd6', 60: '#2f80c9' };
 
@@ -139,14 +141,17 @@ export function renderFull(container, legendEl, rows) {
   function showLegend(i) {
     const r = rows[i];
     if (!r) return;
-    const prev = rows[i - 1];
-    const chg = prev ? r.close - prev.close : 0;
+    const { ref, exRight } = i > 0 || r.change != null ? refOf(rows, i) : { ref: r.close, exRight: false };
+    const chg = r.close - ref;
+    const pctTxt = ref ? `${chg >= 0 ? '+' : '−'}${Math.abs((chg / ref) * 100).toFixed(2)}%` : '';
+    const chgTxt = `${chg > 0 ? '▲' : chg < 0 ? '▼' : ''}${Math.abs(+chg.toFixed(2))}（${pctTxt}）${exRight ? ' 除權息' : ''}`;
     const cls = chg > 0 ? 'up' : chg < 0 ? 'down' : '';
     const ma = CONFIG.maDays
       .map((n) => `<span style="color:${MA_COLORS[n]}">MA${n} ${maVals[n][i] == null ? '—' : maVals[n][i].toFixed(1)}</span>`)
       .join(' ');
     legendEl.innerHTML =
-      `<div>${r.date.replaceAll('-', '/')}　開 ${r.open}　高 ${r.high}　低 ${r.low}　收 <b class="${cls}">${r.close}</b>　量 ${Math.round(r.volume / 1000).toLocaleString()} 張</div>` +
+      `<div><b>${r.date.slice(0, 4)}/${shortDateLabel(r.date)}</b>　收 <b class="${cls}">${r.close}</b> <span class="${cls}">${chgTxt}</span></div>` +
+      `<div>開 ${r.open}　高 ${r.high}　低 ${r.low}　量 ${Math.round(r.volume / 1000).toLocaleString()} 張</div>` +
       `<div>${ma}</div>`;
   }
   showLegend(rows.length - 1);

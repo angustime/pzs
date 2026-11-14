@@ -5,6 +5,7 @@
 import { RULES as R } from './config.js';
 import { sma, kd, rsi, macd, bollinger } from './indicators.js';
 import { refOf, dailyChanges } from './price.js';
+import { detectPattern } from './patterns.js';
 
 const fmtP = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, ''));
 const fmtLots = (n) => Math.abs(n).toLocaleString();
@@ -293,18 +294,22 @@ export function evaluate(rows, chips = [], chipsStatus = { ready: false }) {
   const total = scoreItems.reduce((a, s) => a + s.score, 0);
   const max = Object.values(R.score).reduce((a, b) => a + b, 0);
   const level = total >= R.verdictBull ? 'bull' : total <= R.verdictBear ? 'bear' : 'neutral';
-  const label = { bull: '偏多', bear: '偏空', neutral: '中性，持續觀察' }[level];
+  const strong = total >= R.verdictStrongBull || total <= R.verdictStrongBear;
+  const label = { bull: strong ? '明顯偏多' : '偏多', bear: strong ? '明顯偏空' : '偏空', neutral: '中性，持續觀察' }[level];
   const note = level === 'bull' ? '這是依目前指標統計的結果，不代表之後一定上漲。'
     : level === 'bear' ? '這是依目前指標統計的結果，不代表之後一定下跌。'
       : '偏多和偏空的指標差不多，方向還不明確。這是依目前指標統計的結果，不代表之後的走勢。';
 
   // ---------------- 一句話總結 ----------------
-  const trendWord = { up: '目前屬於上升趨勢', down: '目前屬於下降趨勢', range: '目前在盤整', unknown: '上市時間較短' }[trend];
+  const pattern = detectPattern(rows);
+  const trendWord = pattern ? `目前呈現「${pattern.name}」`
+    : { up: '目前屬於上升趨勢', down: '目前屬於下降趨勢', range: '目前在盤整', unknown: '上市時間較短' }[trend];
   highlights.sort((a, b) => a.p - b.p);
   const summary = highlights.length ? `${trendWord}；${highlights[0].text}。` : `${trendWord}，今天沒有特別明顯的變化。`;
 
   return {
-    verdict: { level, label, score: total, max, items: scoreItems, note, pending: !chipsStatus.ready },
+    verdict: { level, strong, label, score: total, max, items: scoreItems, note, pending: !chipsStatus.ready },
+    pattern,
     summary,
     cards,
   };
