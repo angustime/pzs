@@ -274,3 +274,23 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .info-block summary { cursor: pointer; font-weight: 600; color: var(--brand-2); }
 @media (prefers-color-scheme: dark) { .info-block summary { color: var(--accent); } }
 .info-block p { font-size: 14px; margin: 8px 0 0; }
+
+/* ---- 搜尋下拉選單 ---- */
+.search { position: sticky; }
+.suggest {
+  list-style: none; margin: 6px 0 0; padding: 4px; position: absolute; left: 14px; right: 14px; z-index: 10;
+  background: var(--surface); border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); max-height: 60vh; overflow-y: auto;
+}
+.suggest[hidden] { display: none; }
+.suggest li { display: flex; gap: 12px; align-items: baseline; padding: 10px 12px; border-radius: 8px; cursor: pointer; color: var(--text); }
+.suggest li b { font-variant-numeric: tabular-nums; min-width: 4.5em; color: var(--accent); font-weight: 600; }
+.suggest li.active, .suggest li:hover { background: var(--brand-soft); }
+
+/* ---- 六格數字的標題（可點看解釋） ---- */
+.day-grid .term-mini {
+  background: none; border: 0; padding: 0; gap: 3px; font-size: 12px; color: var(--text-2);
+  justify-content: flex-start; border-radius: 0;
+}
+.day-grid .term-mini span { width: 13px; height: 13px; font-size: 9px; background: var(--text-2); opacity: 0.6; }
+.ex-tag { margin-top: 4px; font-size: 12px; }
+.ex-tag[hidden] { display: none; }

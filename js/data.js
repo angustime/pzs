@@ -2,7 +2,7 @@
 
 import { CONFIG } from './config.js';
 import { cutoffDate, lastPublishMoment, monthFinalMoment, recentMonths } from './dates.js';
-import { fetchStockMonth, FetchError } from './twse.js';
+import { fetchStockMonth, fetchExRight, FetchError } from './twse.js';
 import { loadStock, saveStock } from './store.js';
 
 // 某月份是否需要（重）抓
@@ -70,9 +70,39 @@ export async function getStockData(code, onProgress = () => {}, now = new Date()
     return { status: 'notfound' };
   }
 
+  // 除權息日：補上證交所公布的參考價（查不到也不影響顯示，只是漲跌改用前一天收盤並提示）
+  if (!error) {
+    try { await fillExRightRefs(code, data.rows, onProgress); } catch { /* 忽略 */ }
+  }
+
   saveStock(data);
 
   // 盤後規則：下午三點前不顯示當天資料
   const rows = data.rows.filter((r) => r.date <= cutoff);
   return { status: 'ok', name: data.name, rows, cutoff, stale: !!error, error };
+}
+
+// ---- 除權息參考價 ----
+const EX_PREFIX = 'twstock:v1:exright:';
+function loadEx(month) { try { return JSON.parse(localStorage.getItem(EX_PREFIX + month)); } catch { return null; } }
+function saveEx(month, v) { try { localStorage.setItem(EX_PREFIX + month, JSON.stringify(v)); } catch { /* 忽略 */ } }
+
+async function fillExRightRefs(code, rows, onProgress) {
+  const need = rows.filter((r) => r.exRight && r.ref == null);
+  for (const month of [...new Set(need.map((r) => r.date.slice(0, 7)))]) {
+    let cache = loadEx(month);
+    const missing = need.filter((r) => r.date.startsWith(month) && !(cache && cache.map[`${code}@${r.date}`] != null));
+    const recentlyTried = cache && Date.now() - cache.fetchedAt < CONFIG.chipsRetryMinutes * 60 * 1000;
+    if (missing.length && !recentlyTried) {
+      onProgress('正在查詢除權息參考價…');
+      const [y, m] = month.split('-').map(Number);
+      const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+      cache = { fetchedAt: Date.now(), map: await fetchExRight(`${month}-01`, `${month}-${String(lastDay).padStart(2, '0')}`) };
+      saveEx(month, cache);
+    }
+    for (const r of need) {
+      const v = cache && cache.map[`${code}@${r.date}`];
+      if (r.date.startsWith(month) && v != null) r.ref = v;
+    }
+  }
 }

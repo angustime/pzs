@@ -4,6 +4,7 @@
 
 import { RULES as R } from './config.js';
 import { sma, kd, rsi, macd, bollinger } from './indicators.js';
+import { refOf, dailyChanges } from './price.js';
 
 const fmtP = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, ''));
 const fmtLots = (n) => Math.abs(n).toLocaleString();
@@ -30,6 +31,7 @@ export function evaluate(rows, chips = [], chipsStatus = { ready: false }) {
   const closes = rows.map((r) => r.close);
   const today = last(rows);
   const prev = rows[n - 2];
+  const todayRef = refOf(rows, n - 1); // 參考價（除權息日已扣股利）
   const i = n - 1;
 
   const ma20 = sma(closes, R.maShort);
@@ -82,7 +84,7 @@ export function evaluate(rows, chips = [], chipsStatus = { ready: false }) {
     const avgVol = rows.slice(n - 1 - R.volAvgDays, n - 1).reduce((a, r) => a + r.volume, 0) / R.volAvgDays;
     const ratio = today.volume / avgVol;
     const r1 = ratio.toFixed(1);
-    const upDay = today.close > prev.close, downDay = today.close < prev.close;
+    const upDay = today.close > todayRef.ref, downDay = today.close < todayRef.ref;
     if (ratio >= R.volHugeRatio) {
       add('volume', `今天成交量是平常的 ${r1} 倍，屬於爆量，代表關注度很高，波動可能變大，方向不一定。`, ['爆量', '均量'], 'neutral');
       highlights.push({ p: 1, text: `今天成交量是平常的 ${r1} 倍` });
@@ -176,7 +178,7 @@ export function evaluate(rows, chips = [], chipsStatus = { ready: false }) {
     }
   }
 
-  const base = prev.close;
+  const base = todayRef.ref;
   const body = today.close - today.open;
   const bodyPct = (body / base) * 100;
   const upperShadow = today.high - Math.max(today.open, today.close);
@@ -192,7 +194,12 @@ export function evaluate(rows, chips = [], chipsStatus = { ready: false }) {
   if (upperShadow >= minShadow) add('watch', `今天留下長上影線，盤中衝到 ${fmtP(today.high)} 後被賣回。`, ['上影線／下影線']);
   if (lowerShadow >= minShadow) add('watch', `今天留下長下影線，盤中跌到 ${fmtP(today.low)} 後被買回。`, ['上影線／下影線']);
 
-  if (today.low > prev.high) {
+  if (todayRef.exRight) {
+    // 除權息日股價先扣掉股利，跟前一天直接比會像跳空下跌，所以不判斷缺口
+    add('watch', todayRef.unknown
+      ? '今天是除權息日，股價已先扣掉股利。官方參考價暫時查不到，漲跌先用前一天收盤計算，可能看起來跌比較多。'
+      : `今天是除權息日，股價已先扣掉股利，漲跌以除權息參考價 ${fmtP(todayRef.ref)} 計算。`, ['除權息']);
+  } else if (today.low > prev.high) {
     add('watch', `今天向上跳空，${fmtP(prev.high)}～${fmtP(today.low)} 之間留下缺口。`, ['跳空缺口'], 'up');
     highlights.push({ p: 2, text: '今天向上跳空' });
   } else if (today.high < prev.low) {
@@ -200,7 +207,7 @@ export function evaluate(rows, chips = [], chipsStatus = { ready: false }) {
     highlights.push({ p: 2, text: '今天向下跳空' });
   }
 
-  const changes = closes.slice(1).map((c, j) => c - closes[j]);
+  const changes = dailyChanges(rows).slice(1);
   const st = streak(changes);
   if (st.days >= R.streakDays) {
     add('watch', `已經連續 ${st.days} 天${st.dir > 0 ? '上漲' : '下跌'}。`, [], st.dir > 0 ? 'up' : 'down');

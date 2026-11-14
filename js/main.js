@@ -8,12 +8,15 @@ import { loadLastCode, saveLastCode } from './store.js';
 import { ensureChips, readChips } from './chips.js';
 import { evaluate } from './rules.js';
 import { renderMore } from './links.js';
+import { refOf } from './price.js';
+import { initStockList, setupSearch, nameOf } from './search.js';
 import { renderVerdict, buildCards, updateCards, renderChipsTable, renderMarginTable, setupGlossary } from './ui-state.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
   form: $('searchForm'), input: $('codeInput'), inputError: $('inputError'),
   welcome: $('welcome'), status: $('status'), stock: $('stock'),
+  exRightTag: $('exRightTag'),
   name: $('stockName'), code: $('stockCode'), close: $('close'), change: $('change'),
   asOf: $('asOf'), stale: $('staleWarn'),
   previewBox: $('previewBox'), previewChart: $('previewChart'), trendChart: $('trendChart'), trendDays: $('trendDays'),
@@ -63,7 +66,7 @@ async function query(code) {
 
   hideStatus();
   saveLastCode(code);
-  current = { code, name: res.name, rows: res.rows };
+  current = { code, name: res.name || nameOf(code), rows: res.rows };
   render(res);
   loadChips(token);
 }
@@ -108,9 +111,9 @@ function renderAnalysis(full = true) {
 function render(res) {
   const { rows } = res;
   const last = rows[rows.length - 1];
-  const prev = rows[rows.length - 2];
-  const chg = last.close - prev.close;
-  const pct = (chg / prev.close) * 100;
+  const { ref, exRight, unknown } = refOf(rows, rows.length - 1);
+  const chg = last.close - ref;
+  const pct = (chg / ref) * 100;
   const cls = chg > 0 ? 'up' : chg < 0 ? 'down' : '';
   const arrow = chg > 0 ? '▲' : chg < 0 ? '▼' : '';
 
@@ -120,6 +123,8 @@ function render(res) {
   el.close.className = 'close ' + cls;
   el.change.textContent = `${arrow}${fmt(Math.abs(chg))}（${pct >= 0 ? '' : '−'}${Math.abs(pct).toFixed(2)}%）`;
   el.change.className = 'change ' + cls;
+  el.exRightTag.hidden = !exRight;
+  el.exRightTag.textContent = unknown ? '除權息（參考價未取得）' : '除權息';
   el.asOf.textContent = `資料截至 ${shortDateLabel(last.date)} 收盤（盤後資料）`;
 
   if (res.stale) {
@@ -130,7 +135,7 @@ function render(res) {
   }
 
   el.stock.hidden = false;
-  renderDayGrid(last, prev);
+  renderDayGrid(last, ref);
   renderMore(el.morePanel, current.code, res.name || current.code);
   for (const c of Object.values(panelCharts)) c.remove();
   panelCharts = {};
@@ -139,8 +144,7 @@ function render(res) {
 }
 
 // 當天數字：開高低與昨收比較，比昨收高顯示紅、低顯示綠（台股慣例）
-function renderDayGrid(last, prev) {
-  const ref = prev.close;
+function renderDayGrid(last, ref) {
   const colored = (node, v) => {
     node.textContent = fmt(v);
     node.className = 'val ' + (v > ref ? 'up' : v < ref ? 'down' : '');
@@ -181,19 +185,8 @@ function closeFull(fromPopstate = false) {
 }
 
 // ---- 事件 ----
-el.form.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const code = el.input.value.trim().toUpperCase();
-  if (!/^[0-9]{4}[0-9A-Z]{0,2}$/.test(code)) {
-    el.inputError.hidden = false;
-    el.inputError.textContent = '請輸入 4 到 6 碼的股票代號，例如 2330 或 0050。';
-    return;
-  }
-  el.inputError.hidden = true;
-  el.input.blur();
-  query(code);
-});
-el.input.addEventListener('input', () => { el.inputError.hidden = true; });
+initStockList();
+setupSearch({ input: el.input, list: $('suggest'), form: el.form, error: el.inputError }, query);
 document.querySelector('.tabs').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-tab]');
   if (!b) return;

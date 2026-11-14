@@ -3,6 +3,7 @@
 
 const PREFIX = 'twstock:v1:';
 
+// stock2：2026-11-14 起每筆多存證交所的漲跌價差（change）與除權息參考價（ref），舊的 stock: 資料不再使用
 // 資料格式：
 // {
 //   code, name,
@@ -12,7 +13,7 @@ const PREFIX = 'twstock:v1:';
 
 export function loadStock(code) {
   try {
-    const raw = localStorage.getItem(PREFIX + 'stock:' + code);
+    const raw = localStorage.getItem(PREFIX + 'stock2:' + code);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -21,7 +22,8 @@ export function loadStock(code) {
 
 export function saveStock(data) {
   try {
-    localStorage.setItem(PREFIX + 'stock:' + data.code, JSON.stringify(data));
+    localStorage.setItem(PREFIX + 'stock2:' + data.code, JSON.stringify(data));
+    localStorage.removeItem(PREFIX + 'stock:' + data.code); // 清掉舊格式
     return true;
   } catch {
     return false; // 空間不足或被禁止，不影響本次顯示
