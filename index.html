@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>盤後診股室</title>
+  <meta name="theme-color" content="#1f3a68">
+  <meta name="description" content="用白話說明台股上市股票的盤後技術面狀態。僅供參考，不構成投資建議。">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/favicon-32.png" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="盤後診股室">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="search">
+    <div class="brand">盤後診股室</div>
+    <form id="searchForm" autocomplete="off">
+      <input id="codeInput" type="text" inputmode="numeric"
+             placeholder="輸入股票代號，例如 2330" aria-label="股票代號" maxlength="6">
+      <button type="submit">查詢</button>
+    </form>
+    <p id="inputError" class="input-error" hidden></p>
+  </header>
+
+  <main>
+    <section id="welcome" class="welcome">
+      <p>輸入上市股票代號，查看盤後技術面狀態。</p>
+      <p class="muted">只使用收盤後資料：每天下午三點後才會出現當天的資料。</p>
+    </section>
+
+    <section id="status" class="status" hidden role="status" aria-live="polite"></section>
+
+    <section id="stock" hidden>
+      <div class="card quote-card">
+        <div class="quote">
+          <div>
+            <span id="stockName" class="stock-name"></span>
+            <span id="stockCode" class="stock-code"></span>
+            <span class="tag">上市</span>
+          </div>
+          <div class="price-box">
+            <div id="close" class="close"></div>
+            <div id="change" class="change"></div>
+          </div>
+        </div>
+        <p id="asOf" class="as-of"></p>
+        <p id="staleWarn" class="stale" hidden></p>
+
+        <div class="day-grid">
+          <div><span class="lbl">開盤</span><span id="dOpen" class="val"></span></div>
+          <div><span class="lbl">最高</span><span id="dHigh" class="val"></span></div>
+          <div><span class="lbl">最低</span><span id="dLow" class="val"></span></div>
+          <div><span class="lbl">參考價</span><span id="dRef" class="val"></span></div>
+          <div><span class="lbl">成交量</span><span id="dVol" class="val vol"></span></div>
+          <div><span class="lbl">振幅</span><span id="dAmp" class="val"></span></div>
+        </div>
+      </div>
+
+      <nav class="tabs" role="tablist">
+        <button role="tab" data-tab="state" aria-selected="true">狀態</button>
+        <button role="tab" data-tab="kline">K線</button>
+        <button role="tab" data-tab="chips">法人</button>
+        <button role="tab" data-tab="margin">融資券</button>
+        <button role="tab" data-tab="more">更多</button>
+      </nav>
+
+      <div class="tab-panel" data-panel="state">
+        <div id="verdict" class="card verdict"></div>
+        <div class="card chart-card">
+          <div class="chart-title">近 <span id="trendDays"></span> 個交易日收盤走勢</div>
+          <div id="trendChart" class="trend-chart"></div>
+        </div>
+        <div id="stateCards"></div>
+      </div>
+      <div class="tab-panel" data-panel="kline" hidden>
+        <button id="previewBox" class="card preview" type="button" aria-label="放大 K 線圖">
+          <div id="previewChart" class="preview-chart"></div>
+          <span class="expand-hint">點我放大 ⤢</span>
+        </button>
+        <p class="muted chart-note">紅 K：收盤比開盤高；綠 K：收盤比開盤低。紫線是月線（近 20 日平均價）。</p>
+      </div>
+      <div class="tab-panel" data-panel="chips" hidden>
+        <div id="chipsPanel"></div>
+      </div>
+      <div class="tab-panel" data-panel="margin" hidden>
+        <div id="marginPanel"></div>
+      </div>
+      <div class="tab-panel" data-panel="more" hidden>
+        <div id="morePanel"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="disclaimer">僅供參考，不構成投資建議<br><small>資料來源：臺灣證券交易所　圖表：<a href="https://www.tradingview.com/" target="_blank" rel="noopener">TradingView Lightweight Charts</a></small></footer>
+
+  <div id="termSheet" class="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="termTitle">
+    <div class="sheet-body">
+      <h3 id="termTitle"></h3>
+      <p id="termWhat"></p>
+      <p class="term-how"><b>怎麼看：</b><span id="termHow"></span></p>
+      <button id="termClose" type="button">知道了</button>
+    </div>
+  </div>
+
+  <div id="fullView" class="full-view" hidden role="dialog" aria-modal="true" aria-label="K 線圖">
+    <div class="full-head">
+      <span id="fullTitle"></span>
+      <button id="closeFull" type="button">關閉 ✕</button>
+    </div>
+    <div id="fullLegend" class="full-legend"></div>
+    <div id="fullChart" class="full-chart"></div>
+    <p class="full-tip">可用手指拖曳、兩指縮放。紅 K 代表收盤比開盤高，綠 K 代表收盤比開盤低。</p>
+    <div class="disclaimer">僅供參考，不構成投資建議</div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
