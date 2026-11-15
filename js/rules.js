@@ -1,4 +1,4 @@
-// 狀態判定與偏多／偏空計分。全部是事先寫好的規則與固定文字，不用 AI。
+// 狀態判定與偏強／偏弱計分。全部是事先寫好的規則與固定文字，不用 AI。
 // 門檻來自 config.js 的 RULES；規則內容見開發日誌「判定規則草案」。
 // 文字原則：只描述現況，用「可能、通常、不一定」，不說看好看壞、不給買賣點。
 
@@ -11,6 +11,13 @@ const fmtP = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?
 const fmtLots = (n) => Math.abs(n).toLocaleString();
 const pct = (a, b) => ((a - b) / b) * 100;
 const last = (arr, k = 1) => arr[arr.length - k];
+
+// 均線連續往同一方向走了幾天（dir = 1 往上、-1 往下），從最後一天往回數
+function maRunDays(ma, i, dir) {
+  let days = 0;
+  for (let j = i; j > 0 && ma[j] != null && ma[j - 1] != null && Math.sign(ma[j] - ma[j - 1]) === dir; j--) days++;
+  return days;
+}
 
 // 連續同方向天數：從最後一天往回數，回傳 {dir: 1|-1|0, days, sum}
 function streak(values) {
@@ -55,10 +62,10 @@ export function evaluate(rows, chips = [], chipsStatus = { ready: false }) {
     const down = today.close < ma20[i] && ma20[i] < ma60[i] && ma20[i] < ma20[i - R.maSlopeDays];
     trend = up ? 'up' : down ? 'down' : 'range';
     if (up) {
-      add('trend', '股價在月線和季線之上，月線往上走，屬於上升趨勢。趨勢通常會延續一段時間，但不一定。', ['月線', '季線', '上升趨勢'], 'up');
+      add('trend', `股價在月線和季線之上，屬於上升趨勢。月線往上走，已持續 ${maRunDays(ma20, i, 1)} 天。`, ['月線', '季線', '上升趨勢'], 'up');
       score('趨勢', R.score.trend, '上升趨勢');
     } else if (down) {
-      add('trend', '股價在月線和季線之下，月線往下走，屬於下降趨勢。趨勢通常會延續一段時間，但不一定。', ['月線', '季線', '下降趨勢'], 'down');
+      add('trend', `股價在月線和季線之下，屬於下降趨勢。月線往下走，已持續 ${maRunDays(ma20, i, -1)} 天。`, ['月線', '季線', '下降趨勢'], 'down');
       score('趨勢', -R.score.trend, '下降趨勢');
     } else {
       add('trend', '股價在均線附近上下來回，方向還不明確，屬於盤整。', ['均線', '盤整']);
@@ -74,7 +81,16 @@ export function evaluate(rows, chips = [], chipsStatus = { ready: false }) {
     score('股價與月線', side * R.score.aboveMa, side > 0 ? '站在月線之上' : side < 0 ? '在月線之下' : '剛好在月線上');
     const bias = pct(today.close, ma20[i]);
     if (Math.abs(bias) >= R.biasPct) {
-      add('trend', `股價比月線${bias > 0 ? '高出' : '低了'} ${Math.abs(bias).toFixed(1)}%，距離偏大，之後可能拉近，但不一定。`, ['乖離', '月線'], bias > 0 ? 'up' : 'down');
+      // 近 60 日有幾天（含今天）離月線同方向這麼遠，讓新手知道「遠」是多遠
+      let far = 0, seen = 0;
+      for (let j = Math.max(0, i - R.highLowDays + 1); j <= i; j++) {
+        if (ma20[j] == null) continue;
+        seen++;
+        const b = pct(rows[j].close, ma20[j]);
+        if (Math.sign(b) === Math.sign(bias) && Math.abs(b) >= Math.abs(bias)) far++;
+      }
+      const rare = far <= Math.max(3, seen / 6) ? `近 ${seen} 個交易日裡，只有 ${far} 天離月線這麼遠。` : `近 ${seen} 個交易日裡，有 ${far} 天離月線這麼遠。`;
+      add('trend', `股價比月線${bias > 0 ? '高出' : '低了'} ${Math.abs(bias).toFixed(1)}%，離平均價較遠，表示最近${bias > 0 ? '漲' : '跌'}得比較快。${rare}`, ['乖離', '月線'], bias > 0 ? 'up' : 'down');
     } else {
       add('trend', `收盤 ${fmtP(today.close)}，月線約 ${fmtP(+ma20[i].toFixed(1))}，股價在月線${above ? '之上' : '之下'} ${Math.abs(bias).toFixed(1)}%。`, ['月線']);
     }
@@ -118,10 +134,10 @@ export function evaluate(rows, chips = [], chipsStatus = { ready: false }) {
       for (let j = i; j >= 0 && K[j] != null && (highZone ? K[j] >= R.kdHigh : K[j] <= R.kdLow); j--) stuck++;
     }
     if (highZone && stuck >= R.kdStuckDays) {
-      add('kd', `${kTxt}，已連續 ${stuck} 天在 ${R.kdHigh} 以上（高檔鈍化），代表走勢很強，不一定馬上轉弱。`, ['KD 值', '鈍化'], 'up');
+      add('kd', `${kTxt}，已連續 ${stuck} 天在 ${R.kdHigh} 以上（高檔鈍化），代表最近走勢很強，這時 KD 偏高的參考性會變低。`, ['KD 值', '鈍化'], 'up');
       highlights.push({ p: 4, text: `KD 連續 ${stuck} 天在高檔` });
     } else if (lowZone && stuck >= R.kdStuckDays) {
-      add('kd', `${kTxt}，已連續 ${stuck} 天在 ${R.kdLow} 以下（低檔鈍化），代表走勢很弱，不一定馬上止跌。`, ['KD 值', '鈍化'], 'down');
+      add('kd', `${kTxt}，已連續 ${stuck} 天在 ${R.kdLow} 以下（低檔鈍化），代表最近走勢很弱，這時 KD 偏低的參考性會變低。`, ['KD 值', '鈍化'], 'down');
       highlights.push({ p: 4, text: `KD 連續 ${stuck} 天在低檔` });
     } else if (highZone) {
       add('kd', `${kTxt}，在 ${R.kdHigh} 以上的偏高區，短線漲幅較大；強勢股也常在偏高區停留一段時間。`, ['KD 值', '偏高區／偏低區']);
@@ -283,7 +299,7 @@ export function evaluate(rows, chips = [], chipsStatus = { ready: false }) {
     }
     if (lm.margin >= R.shortRatioMinMargin) {
       const sr = (lm.short / lm.margin) * 100;
-      if (sr >= R.shortRatioPct) add('inst', `券資比 ${sr.toFixed(0)}%，看空的人較多，但也可能出現軋空的急漲。`, ['融券', '券資比', '軋空'], 'neutral');
+      if (sr >= R.shortRatioPct) add('inst', `券資比 ${sr.toFixed(0)}%，看空的人較多，股價波動可能變大。`, ['融券', '券資比'], 'neutral');
     }
     if (last(mRows).date !== today.date) {
       add('inst', `融資融券資料目前只到 ${last(mRows).date.slice(5).replace('-', '/')}（通常晚上才公布）。`, ['融資', '融券']);
@@ -295,10 +311,10 @@ export function evaluate(rows, chips = [], chipsStatus = { ready: false }) {
   const max = Object.values(R.score).reduce((a, b) => a + b, 0);
   const level = total >= R.verdictBull ? 'bull' : total <= R.verdictBear ? 'bear' : 'neutral';
   const strong = total >= R.verdictStrongBull || total <= R.verdictStrongBear;
-  const label = { bull: strong ? '明顯偏多' : '偏多', bear: strong ? '明顯偏空' : '偏空', neutral: '中性，持續觀察' }[level];
+  const label = { bull: strong ? '明顯偏強' : '偏強', bear: strong ? '明顯偏弱' : '偏弱', neutral: '中性，持續觀察' }[level];
   const note = level === 'bull' ? '這是依目前指標統計的結果，不代表之後一定上漲。'
     : level === 'bear' ? '這是依目前指標統計的結果，不代表之後一定下跌。'
-      : '偏多和偏空的指標差不多，方向還不明確。這是依目前指標統計的結果，不代表之後的走勢。';
+      : '偏強和偏弱的指標差不多，方向還不明確。這是依目前指標統計的結果，不代表之後的走勢。';
 
   // ---------------- 一句話總結 ----------------
   const pattern = detectPattern(rows);

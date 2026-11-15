@@ -11,13 +11,15 @@ import { renderMore } from './links.js';
 import { refOf } from './price.js';
 import { initStockList, setupSearch, nameOf } from './search.js';
 import { setupWatchUI } from './watch-ui.js';
+import { INDUSTRY } from './industry.js';
+import { GLOSSARY } from './glossary.js';
 import { renderVerdict, buildCards, updateCards, renderChipsTable, renderMarginTable, setupGlossary } from './ui-state.js';
 
 const $ = (id) => document.getElementById(id);
 const el = {
   form: $('searchForm'), input: $('codeInput'), inputError: $('inputError'),
   welcome: $('welcome'), status: $('status'), stock: $('stock'),
-  exRightTag: $('exRightTag'), watchBar: $('watchBar'), watchBtn: $('watchBtn'),
+  exRightTag: $('exRightTag'), industry: $('industry'), watchBar: $('watchBar'), watchBtn: $('watchBtn'),
   name: $('stockName'), code: $('stockCode'), close: $('close'), change: $('change'),
   asOf: $('asOf'), stale: $('staleWarn'),
   previewBox: $('previewBox'), previewChart: $('previewChart'), trendChart: $('trendChart'), trendDays: $('trendDays'),
@@ -129,6 +131,17 @@ function render(res) {
 
   el.name.textContent = res.name || current.code;
   el.code.textContent = current.code;
+  // 產業別（證交所官方分類，靜態資料）；ETF 等有名詞解釋的就做成可點的按鈕
+  const ind = INDUSTRY[current.code] || '';
+  el.industry.innerHTML = '';
+  if (ind && GLOSSARY[ind]) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'term industry-term'; b.dataset.term = ind;
+    b.innerHTML = `${ind}<span aria-hidden="true">?</span>`;
+    el.industry.append(b);
+  } else {
+    el.industry.textContent = ind;
+  }
   el.close.textContent = fmt(last.close);
   el.close.className = 'close ' + cls;
   el.change.textContent = `${arrow}${fmt(Math.abs(chg))}（${pct >= 0 ? '' : '−'}${Math.abs(pct).toFixed(2)}%）`;

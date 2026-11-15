@@ -80,7 +80,7 @@ export const RULES = {
   shortRatioPct: 30,      // 券資比 ≥ 30%
   shortRatioMinMargin: 500, // 融資餘額太少時券資比沒意義，至少要有幾張
 
-  // ---- 偏多／偏空計分 ----
+  // ---- 偏強／偏弱計分 ----
   score: {
     trend: 2,             // 上升 +2、下降 −2
     aboveMa: 1,           // 收盤在月線上 +1、下 −1
@@ -93,10 +93,10 @@ export const RULES = {
   },
   rsiBull: 55,
   rsiBear: 45,
-  verdictStrongBull: 6,   // 總分 ≥ 6 明顯偏多
-  verdictBull: 3,         // 總分 ≥ 3 偏多
-  verdictBear: -3,        // 總分 ≤ −3 偏空
-  verdictStrongBear: -6,  // 總分 ≤ −6 明顯偏空
+  verdictStrongBull: 6,   // 總分 ≥ 6 明顯偏強
+  verdictBull: 3,         // 總分 ≥ 3 偏強
+  verdictBear: -3,        // 總分 ≤ −3 偏弱
+  verdictStrongBear: -6,  // 總分 ≤ −6 明顯偏弱
 
   // ---- 目前型態（多頭排列、高檔盤整…） ----
   pattern: {

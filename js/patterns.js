@@ -59,24 +59,36 @@ export function detectPattern(rows) {
   const trendDownBase = ma20[i] < ma60[i] && down(ma20);
   const make = (name, text, tone) => ({ name, text, tone, tags });
 
+  // 第 j 天是否為多頭（dir=1）／空頭（dir=-1）排列
+  const aligned = (j, dir) => {
+    const k = j - P.slopeDays;
+    if (k < 0 || [ma5[j], ma20[j], ma60[j], ma5[k], ma20[k], ma60[k]].some((v) => v == null)) return false;
+    const s = (a, b) => Math.sign(a - b) === dir;
+    return s(closes[j], ma5[j]) && s(ma5[j], ma20[j]) && s(ma20[j], ma60[j]) && s(ma5[j], ma5[k]) && s(ma20[j], ma20[k]) && s(ma60[j], ma60[k]);
+  };
+  // 排列已連續維持幾天（含今天）
+  const heldDays = (dir) => { let d = 0; for (let j = i; j >= 0 && aligned(j, dir); j--) d++; return d; };
+  // 近 20 日高點／低點出現在幾個交易日前（同價取最近一次）
+  const daysSince = (pick, value) => { for (let j = i; j >= n - P.rangeDays; j--) if (rows[j][pick] === value) return i - j; return 0; };
+
   // 依序判斷，第一個符合的就是目前型態
   if (consolidating && today.close > priorHigh) {
-    return make('突破整理區間', `收盤 ${fmtP(today.close)} 高於前 ${P.rangeDays} 個交易日的最高價 ${fmtP(priorHigh)}，突破最近一個月來回整理的範圍。突破後可能延續，也可能回到區間內。`, 'up');
+    return make('突破整理區間', `收盤 ${fmtP(today.close)} 高於前 ${P.rangeDays} 個交易日的最高價 ${fmtP(priorHigh)}，突破最近一個月來回整理的範圍。`, 'up');
   }
   if (consolidating && today.close < priorLow) {
-    return make('跌破整理區間', `收盤 ${fmtP(today.close)} 低於前 ${P.rangeDays} 個交易日的最低價 ${fmtP(priorLow)}，跌破最近一個月來回整理的範圍。跌破後可能延續，也可能回到區間內。`, 'down');
+    return make('跌破整理區間', `收盤 ${fmtP(today.close)} 低於前 ${P.rangeDays} 個交易日的最低價 ${fmtP(priorLow)}，跌破最近一個月來回整理的範圍。`, 'down');
   }
-  if (today.close > ma5[i] && ma5[i] > ma20[i] && ma20[i] > ma60[i] && up(ma5) && up(ma20) && up(ma60)) {
-    return make('多頭排列', `收盤在 5 日線之上，5 日線 > 月線 > 季線，三條均線都往上，是很典型的上漲走勢。這種排列通常會維持一段時間，但不一定。`, 'up');
+  if (aligned(i, 1)) {
+    return make('多頭排列', `收盤在 5 日線之上，5 日線 > 月線 > 季線，三條均線都往上，是典型的上漲排列，已維持 ${heldDays(1)} 天。`, 'up');
   }
-  if (today.close < ma5[i] && ma5[i] < ma20[i] && ma20[i] < ma60[i] && down(ma5) && down(ma20) && down(ma60)) {
-    return make('空頭排列', `收盤在 5 日線之下，5 日線 < 月線 < 季線，三條均線都往下，是很典型的下跌走勢。這種排列通常會維持一段時間，但不一定。`, 'down');
+  if (aligned(i, -1)) {
+    return make('空頭排列', `收盤在 5 日線之下，5 日線 < 月線 < 季線，三條均線都往下，是典型的下跌排列，已維持 ${heldDays(-1)} 天。`, 'down');
   }
   if (trendUpBase && pct(today.close, recentHigh) <= -P.pullbackPct) {
-    return make('上升趨勢中回檔', `月線在季線之上而且往上走，但股價比近 ${P.rangeDays} 日高點 ${fmtP(recentHigh)} 回落了 ${Math.abs(pct(today.close, recentHigh)).toFixed(1)}%，是上漲過程中的修正。回檔會修正多久不一定。`, 'neutral');
+    return make('上升趨勢中回檔', `月線在季線之上而且往上走，但股價比近 ${P.rangeDays} 日高點 ${fmtP(recentHigh)} 回落了 ${Math.abs(pct(today.close, recentHigh)).toFixed(1)}%，是上漲過程中的修正，${daysSince('high', recentHigh) ? `已從高點回落 ${daysSince('high', recentHigh)} 天` : '今天從高點回落'}。`, 'neutral');
   }
   if (trendDownBase && pct(today.close, recentLow) >= P.reboundPct) {
-    return make('下降趨勢中反彈', `月線在季線之下而且往下走，但股價比近 ${P.rangeDays} 日低點 ${fmtP(recentLow)} 彈起了 ${pct(today.close, recentLow).toFixed(1)}%，是下跌過程中的反彈。反彈能不能延續不一定。`, 'neutral');
+    return make('下降趨勢中反彈', `月線在季線之下而且往下走，但股價比近 ${P.rangeDays} 日低點 ${fmtP(recentLow)} 彈起了 ${pct(today.close, recentLow).toFixed(1)}%，是下跌過程中的反彈，${daysSince('low', recentLow) ? `已從低點反彈 ${daysSince('low', recentLow)} 天` : '今天從低點反彈'}。`, 'neutral');
   }
   if (rangePct < P.rangeNarrowPct) {
     const where = `近 ${P.rangeDays} 日在 ${fmtP(recentLow)}～${fmtP(recentHigh)} 之間（高低差 ${rangePct.toFixed(1)}%）`;

@@ -49,13 +49,13 @@ export function renderVerdict(container, result) {
       <span class="verdict-label">技術面</span>
       <span class="verdict-level">${esc(v.label)}</span>
       <span class="verdict-score">${sign}${Math.abs(v.score)}<small> / ±${v.max}</small></span>
-      ${termBtn('偏多／偏空')}
+      ${termBtn('偏強／偏弱')}
     </div>
     <p class="summary">${esc(result.summary)}</p>
     <details>
-      <summary>看根據（${v.items.filter((s) => s.score > 0).length} 項偏多、${v.items.filter((s) => s.score < 0).length} 項偏空、${v.items.filter((s) => s.score === 0).length} 項中性）</summary>
-      ${reasons((s) => s.score > 0, '偏多', 'bull')}
-      ${reasons((s) => s.score < 0, '偏空', 'bear')}
+      <summary>看根據（${v.items.filter((s) => s.score > 0).length} 項偏強、${v.items.filter((s) => s.score < 0).length} 項偏弱、${v.items.filter((s) => s.score === 0).length} 項中性）</summary>
+      ${reasons((s) => s.score > 0, '偏強', 'bull')}
+      ${reasons((s) => s.score < 0, '偏弱', 'bear')}
       ${reasons((s) => s.score === 0, '中性', 'neutral')}
     </details>
     ${v.pending ? '<p class="verdict-pending">法人資料下載中，下載完成後總評可能會改變。</p>' : ''}
@@ -67,7 +67,7 @@ const legendHtml = (legend) => legend.map(([c, label]) => {
   return `<span>${swatch}${esc(label)}</span>`;
 }).join('');
 
-// 某個指標目前偏哪邊：有偏多沒偏空 → up，反之 → down，其餘 → neutral（分頁上的小圓點）
+// 某個指標目前偏哪邊：有偏強沒偏弱 → up，反之 → down，其餘 → neutral（分頁上的小圓點）
 function toneOf(items) {
   const up = items.some((x) => x.tone === 'up'), down = items.some((x) => x.tone === 'down');
   return up && !down ? 'up' : down && !up ? 'down' : 'neutral';
