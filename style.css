@@ -232,7 +232,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 @media (prefers-color-scheme: dark) { .sheet-body h3 { color: var(--accent); } }
 .sheet-body p { margin: 0 0 10px; }
 .term-how { background: var(--brand-soft); border-radius: 10px; padding: 10px 12px; }
-.sheet-body button { width: 100%; padding: 10px; border: 0; border-radius: 10px; background: var(--brand-2); color: #fff; font-weight: 600; }
+.sheet-body > button { width: 100%; padding: 10px; border: 0; border-radius: 10px; background: var(--brand-2); color: #fff; font-weight: 600; }
 
 /* ---- 法人、融資券表格 ---- */
 .panel-head { font-weight: 600; margin: 0 0 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
@@ -358,3 +358,34 @@ button { font: inherit; color: inherit; cursor: pointer; }
 /* ---- 產業別（名稱旁小字） ---- */
 .industry { font-size: 13px; color: var(--text-2); margin-left: 4px; }
 .industry .industry-term { font-size: 12px; padding: 0 4px 0 8px; vertical-align: 2px; }
+
+/* ---- 標題列說明按鈕、首頁按鈕、說明視窗 ---- */
+.brand-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.brand-row .brand { margin-bottom: 0; }
+.info-btn { border: 1px solid rgba(255,255,255,0.35); background: rgba(255,255,255,0.12); color: #fff; border-radius: 14px; padding: 2px 12px; font-size: 13px; }
+.welcome-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 14px; }
+.welcome-actions button { border: 1px solid var(--border); background: var(--brand-soft); color: var(--accent); border-radius: 18px; padding: 8px 16px; font-size: 14px; font-weight: 600; }
+.info-sheet { max-height: 85vh; overflow-y: auto; }
+.info-sheet .info-block { box-shadow: none; border: 1px solid var(--border); margin-bottom: 10px; }
+
+/* ---- 版本號（標題列右邊）、搜尋框下方那一排：自選＋說明 ---- */
+.app-version { color: #c9d6ee; font-size: 12px; border: 1px solid rgba(255,255,255,0.25); border-radius: 10px; padding: 0 8px; }
+.sub-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.sub-row .watch-bar { margin-top: 0; flex: 1; min-width: 0; }
+.sub-row .info-btn { flex: none; padding: 4px 12px; font-size: 14px; border-radius: 16px; }
+.checking { margin: -4px 0 8px; font-size: 12px; color: var(--accent); }
+
+/* ---- 儲存空間 ---- */
+.storage-sum, .storage-list { list-style: none; margin: 8px 0; padding: 0; font-size: 14px; }
+.storage-sum li { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dashed var(--border); }
+.storage-list li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.storage-list small { color: var(--text-2); }
+.storage-list button { border: 1px solid var(--border); background: var(--surface-2); color: var(--err-text); border-radius: 8px; padding: 2px 10px; font-size: 13px; }
+.danger-btn { width: 100%; margin-top: 8px; padding: 9px; border-radius: 10px; border: 1px solid var(--err-text); background: none; color: var(--err-text); font-weight: 600; }
+
+/* ---- 選單按鈕紅點、選單標題 ---- */
+.info-btn { position: relative; }
+.menu-dot { position: absolute; top: -2px; right: -2px; width: 9px; height: 9px; border-radius: 50%; background: #ff4d4f; border: 2px solid var(--brand); }
+.menu-dot[hidden] { display: none; }
+.menu-title { margin: 0 0 10px; font-size: 17px; }
+.info-block summary small { font-weight: 400; margin-left: 6px; }

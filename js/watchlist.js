@@ -73,3 +73,18 @@ export function renameGroup(gi, name) {
   groups[gi].name = clean || DEFAULT_NAMES[gi];
   return save(groups);
 }
+
+// 大盤預設放在自選1 第一個（每支手機只做一次；使用者移除後不會再加回來）
+const SEED_KEY = 'twstock:v1:indexSeeded';
+export function seedIndexOnce(code, name) {
+  try {
+    if (localStorage.getItem(SEED_KEY)) return;
+    const groups = loadGroups();
+    const g = groups[0];
+    if (!groups.some((x) => x.items.some((it) => it.code === code)) && g.items.length < GROUP_MAX) {
+      g.items.unshift({ code, name });
+      save(groups);
+    }
+    localStorage.setItem(SEED_KEY, '1');
+  } catch { /* 無法儲存就略過 */ }
+}

@@ -6,7 +6,7 @@ import { RULES } from './config.js';
 import { sma } from './indicators.js';
 
 const P = RULES.pattern;
-const fmtP = (n) => (Number.isInteger(n) ? String(n) : (+n.toFixed(2)).toString());
+const fmtP = (n) => n.toLocaleString('en-US', { maximumFractionDigits: 2 }); // 千分位，最多 2 位小數
 const pct = (a, b) => ((a - b) / b) * 100;
 
 /**

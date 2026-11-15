@@ -6,8 +6,9 @@ import { RULES as R } from './config.js';
 import { sma, kd, rsi, macd, bollinger } from './indicators.js';
 import { refOf, dailyChanges } from './price.js';
 import { detectPattern } from './patterns.js';
+import { volOf, volUnit, volName, isIndexMode } from './units.js';
 
-const fmtP = (n) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/\.?0+$/, ''));
+const fmtP = (n) => n.toLocaleString('en-US', { maximumFractionDigits: 2 }); // 千分位，最多 2 位小數
 const fmtLots = (n) => Math.abs(n).toLocaleString();
 const pct = (a, b) => ((a - b) / b) * 100;
 const last = (arr, k = 1) => arr[arr.length - k];
@@ -103,15 +104,15 @@ export function evaluate(rows, chips = [], chipsStatus = { ready: false }) {
     const r1 = ratio.toFixed(1);
     const upDay = today.close > todayRef.ref, downDay = today.close < todayRef.ref;
     if (ratio >= R.volHugeRatio) {
-      add('volume', `今天成交量是平常的 ${r1} 倍，屬於爆量，代表關注度很高，波動可能變大，方向不一定。`, ['爆量', '均量'], 'neutral');
-      highlights.push({ p: 1, text: `今天成交量是平常的 ${r1} 倍` });
+      add('volume', `今天${volName()}是平常的 ${r1} 倍，屬於爆量，代表關注度很高，波動可能變大，方向不一定。`, ['爆量', '均量'], 'neutral');
+      highlights.push({ p: 1, text: `今天${volName()}是平常的 ${r1} 倍` });
     } else if (ratio >= R.volBigRatio) {
-      add('volume', `今天成交量約是平常的 ${r1} 倍，明顯放大，代表關注度變高，方向不一定。`, ['成交量倍數', '均量']);
-      highlights.push({ p: 6, text: `成交量放大到平常的 ${r1} 倍` });
+      add('volume', `今天${volName()}約是平常的 ${r1} 倍，明顯放大，代表關注度變高，方向不一定。`, ['成交量倍數', '均量']);
+      highlights.push({ p: 6, text: `${volName()}放大到平常的 ${r1} 倍` });
     } else if (ratio <= R.volSmallRatio) {
-      add('volume', `今天成交量只有平常的 ${r1} 倍，比平常少很多，市場可能在觀望。`, ['量縮', '均量']);
+      add('volume', `今天${volName()}只有平常的 ${r1} 倍，比平常少很多，市場可能在觀望。`, ['量縮', '均量']);
     } else {
-      add('volume', `今天成交量約是平常的 ${r1} 倍，跟平常差不多。`, ['成交量倍數', '均量']);
+      add('volume', `今天${volName()}約是平常的 ${r1} 倍，跟平常差不多。`, ['成交量倍數', '均量']);
     }
     if (ratio >= R.volBigRatio && upDay) {
       add('volume', '量放大而且收漲（量增價漲），買盤較積極。', ['量價'], 'up');
@@ -265,24 +266,24 @@ export function evaluate(rows, chips = [], chipsStatus = { ready: false }) {
         // 連續天數等於抓到的天數時，實際可能更長，改用「近 N 天每天都…」
         const allDays = s.days >= instRows.length;
         const desc = allDays ? `近 ${s.days} 天每天都${s.dir > 0 ? '買超' : '賣超'}` : `連續 ${s.days} 天${s.dir > 0 ? '買超' : '賣超'}`;
-        add('inst', `${label}${desc}，合計約 ${fmtLots(s.sum)} 張。`, [label, '買賣超'], s.dir > 0 ? 'up' : 'down');
+        add('inst', `${label}${desc}，合計約 ${fmtLots(s.sum)} ${volUnit()}。`, [label, '買賣超'], s.dir > 0 ? 'up' : 'down');
         score(label, s.dir > 0 ? R.score[key] : -R.score[key], `${label}連 ${s.days} 日${s.dir > 0 ? '買超' : '賣超'}`);
         highlights.push({ p: 6, text: `${label}${desc}` });
       } else {
         const v = last(instRows).inst[key];
-        add('inst', `${label}今天${v > 0 ? `買超 ${fmtLots(v)} 張` : v < 0 ? `賣超 ${fmtLots(v)} 張` : '沒有買賣超'}，近幾天沒有連續同方向。`, [label, '買賣超']);
+        add('inst', `${label}今天${v > 0 ? `買超 ${fmtLots(v)} ${volUnit()}` : v < 0 ? `賣超 ${fmtLots(v)} ${volUnit()}` : '沒有買賣超'}，近幾天沒有連續同方向。`, [label, '買賣超']);
         score(label, 0, `${label}沒有連續同方向`);
       }
     }
     const wd = R.instWeightDays;
     if (instRows.length >= wd) {
       const sumNet = instRows.slice(-wd).reduce((a, c) => a + c.inst.total, 0);
-      const volMap = new Map(rows.map((r) => [r.date, r.volume / 1000]));
+      const volMap = new Map(rows.map((r) => [r.date, volOf(r)]));
       const sumVol = instRows.slice(-wd).reduce((a, c) => a + (volMap.get(c.date) || 0), 0);
       if (sumVol > 0) {
         const w = (Math.abs(sumNet) / sumVol) * 100;
         if (w >= R.instWeightPct) {
-          add('inst', `近 ${wd} 天三大法人合計${sumNet > 0 ? '買超' : '賣超'} ${fmtLots(sumNet)} 張，約佔成交量 ${w.toFixed(0)}%，法人動向對股價的影響可能較大。`, ['三大法人', '法人比重'], sumNet > 0 ? 'up' : 'down');
+          add('inst', `近 ${wd} 天三大法人合計${sumNet > 0 ? '買超' : '賣超'} ${fmtLots(sumNet)} ${volUnit()}，約佔成交${volUnit() === '張' ? '量' : '金額'} ${w.toFixed(0)}%，法人動向對股價的影響可能較大。`, ['三大法人', '法人比重'], sumNet > 0 ? 'up' : 'down');
         }
       }
     }
@@ -322,6 +323,13 @@ export function evaluate(rows, chips = [], chipsStatus = { ready: false }) {
     : { up: '目前屬於上升趨勢', down: '目前屬於下降趨勢', range: '目前在盤整', unknown: '上市時間較短' }[trend];
   highlights.sort((a, b) => a.p - b.p);
   const summary = highlights.length ? `${trendWord}；${highlights[0].text}。` : `${trendWord}，今天沒有特別明顯的變化。`;
+
+  // 大盤：文字裡的「股價」改成「指數」
+  if (isIndexMode()) {
+    const fix = (t) => t.replaceAll('股價', '指數');
+    for (const list of Object.values(cards)) for (const it of list) it.text = fix(it.text);
+    if (pattern) { pattern.text = fix(pattern.text); for (const t of pattern.tags) t.text = fix(t.text); }
+  }
 
   return {
     verdict: { level, strong, label, score: total, max, items: scoreItems, note, pending: !chipsStatus.ready },

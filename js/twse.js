@@ -130,3 +130,45 @@ export function parseStockListCsv(text) {
   }
   return list;
 }
+
+// ---- 大盤（發行量加權股價指數） ----
+// 一個月抓兩份：MI_5MINS_HIST（開高低收指數）＋ FMTQIK（成交金額、漲跌點數），依日期合併。
+// 回傳格式跟個股一樣：{ found, name, rows }，volume 放「成交金額（元）」。
+export async function fetchIndexMonth(month) {
+  const date = month.replace('-', '') + '01';
+  const hist = await throttledFetchJson(`${BASE}/TAIEX/MI_5MINS_HIST?date=${date}&response=json`);
+  if (hist.stat !== 'OK') {
+    if (String(hist.stat).includes(NO_DATA)) return { found: false };
+    throw new FetchError(`證交所回覆：${hist.stat}`);
+  }
+  const mkt = await throttledFetchJson(`${BASE}/afterTrading/FMTQIK?date=${date}&response=json`);
+  const extra = new Map();
+  if (mkt.stat === 'OK') {
+    // 欄位：日期, 成交股數, 成交金額, 成交筆數, 發行量加權股價指數, 漲跌點數
+    for (const r of mkt.data || []) extra.set(rocToIso(r[0]), { amount: num(r[2]), change: num(String(r[5]).replace('+', '')) });
+  }
+  const rows = [];
+  for (const r of hist.data || []) {
+    // 欄位：日期, 開盤指數, 最高指數, 最低指數, 收盤指數
+    const d = rocToIso(r[0]);
+    const x = extra.get(d) || {};
+    const row = { date: d, open: num(r[1]), high: num(r[2]), low: num(r[3]), close: num(r[4]), volume: x.amount ?? 0 };
+    if ([row.open, row.high, row.low, row.close].some((v) => v == null)) continue;
+    if (x.change != null) row.change = x.change;
+    rows.push(row);
+  }
+  return { found: true, name: '加權指數', rows };
+}
+
+// 三大法人買賣金額（全市場）：回傳 [外資, 投信, 自營商, 合計]（單位：億元），沒資料回 null
+export async function fetchMarketInst(dateIso) {
+  const json = await throttledFetchJson(`${BASE}/fund/BFI82U?dayDate=${dateIso.replaceAll('-', '')}&type=day&response=json`);
+  if (json.stat !== 'OK') {
+    if (String(json.stat).includes(NO_DATA)) return null;
+    throw new FetchError(`證交所回覆：${json.stat}`);
+  }
+  // 列：自營商(自行買賣)、自營商(避險)、投信、外資及陸資(不含外資自營商)、外資自營商、合計；最後一欄是買賣差額（元）
+  const net = (re) => (json.data || []).filter((r) => re.test(String(r[0]))).reduce((a, r) => a + (num(r.at(-1)) || 0), 0);
+  const yi = (v) => Math.round(v / 1e7) / 10; // 元 → 億元，取 1 位小數
+  return [yi(net(/^外資/)), yi(net(/^投信/)), yi(net(/^自營商/)), yi(net(/^合計/))];
+}

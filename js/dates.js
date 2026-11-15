@@ -28,29 +28,30 @@ export function addDays(y, m, d, n) {
 }
 
 // 目前允許顯示的最後日期（YYYY-MM-DD）：
-// 台北時間下午三點（afterCloseHour）以後才包含今天，之前只到昨天。
+// 台北時間收盤（closeMinutes，預設 13:30 = 810 分）以後才可能包含今天，之前只到昨天。
 // 這是「最多到哪天」的上限，實際最後交易日由證交所資料決定（休市日自然沒有資料）。
-export function cutoffDate(now, afterCloseHour) {
+export function cutoffDate(now, closeMinutes) {
   const t = taipeiParts(now);
-  if (t.h >= afterCloseHour) return isoDate(t.y, t.m, t.d);
+  if (t.h * 60 + t.min >= closeMinutes) return isoDate(t.y, t.m, t.d);
   const y = addDays(t.y, t.m, t.d, -1);
   return isoDate(y.y, y.m, y.d);
 }
 
-// 最近一次「收盤資料公布」的時間點：今天 15:00 已過就是今天 15:00，否則是昨天 15:00。
-// 若某月份資料是在這個時間點之後抓的，就不用重抓。
-export function lastPublishMoment(now, afterCloseHour) {
-  const t = taipeiParts(now);
-  if (t.h >= afterCloseHour) return taipeiMoment(t.y, t.m, t.d, afterCloseHour);
-  const y = addDays(t.y, t.m, t.d, -1);
-  return taipeiMoment(y.y, y.m, y.d, afterCloseHour);
+// 最近一個「應該有資料」的交易日：從 cutoffDate 往前跳過週六、週日。
+// 國定假日無法事先知道，遇到時頂多多問證交所一次。
+export function expectedTradingDate(now, closeMinutes) {
+  let [y, m, d] = cutoffDate(now, closeMinutes).split('-').map(Number);
+  for (;;) {
+    const w = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    if (w !== 0 && w !== 6) return isoDate(y, m, d);
+    ({ y, m, d } = addDays(y, m, d, -1));
+  }
 }
 
-// 某月最後一天下午三點：在這之後抓到的該月資料就是完整的，永遠不用重抓
-export function monthFinalMoment(y, m, afterCloseHour) {
-  // 下個月 1 號減一天 = 本月最後一天（Date.UTC 會自動處理 12 月跨年）
-  const lastDay = addDays(y, m + 1, 1, -1);
-  return taipeiMoment(lastDay.y, lastDay.m, lastDay.d, afterCloseHour);
+// 某月資料「一定完整」的時間點：下個月 1 號 00:00（台北）。在這之後抓到的該月資料永遠不用重抓。
+export function monthCompleteMoment(y, m) {
+  const n = addDays(y, m + 1, 1, 0); // Date.UTC 會自動處理 12 月跨年
+  return taipeiMoment(n.y, n.m, n.d, 0);
 }
 
 // 從目前月份往回數 n 個月，回傳 ['2026-05', ..., '2026-11']（舊到新）

@@ -3,6 +3,10 @@
 
 import { STOCK_LIST, STOCK_LIST_DATE } from './stock-list.js';
 import { fetchStockList } from './twse.js';
+import { INDEX_CODE, INDEX_NAME } from './units.js';
+
+// 大盤不在股票清單裡，用這些關鍵字叫出
+const INDEX_KEYS = ['大盤', '加權', '指數', 'TAIEX', 'TWII'];
 
 const KEY = 'twstock:v1:stocklist';
 const REFRESH_DAYS = 7;
@@ -36,7 +40,7 @@ export function initStockList() {
   }
 }
 
-export const nameOf = (code) => (list.find((s) => s[0] === code) || [])[1] || '';
+export const nameOf = (code) => (code === INDEX_CODE ? INDEX_NAME : (list.find((s) => s[0] === code) || [])[1] || '');
 
 // 半形化、去空白、轉大寫；「台」「臺」視為相同
 const norm = (s) => s.normalize('NFKC').replace(/\s+/g, '').toUpperCase().replace(/臺/g, '台');
@@ -57,7 +61,9 @@ export function searchStocks(text) {
     if (s >= 0) scored.push([s, code, name]);
   }
   scored.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1]));
-  return scored.slice(0, MAX_ITEMS).map(([, code, name]) => ({ code, name }));
+  const res = scored.slice(0, MAX_ITEMS).map(([, code, name]) => ({ code, name }));
+  if (INDEX_KEYS.some((k) => norm(k).startsWith(q) || q.startsWith(norm(k)))) res.unshift({ code: INDEX_CODE, name: `${INDEX_NAME}（大盤）` });
+  return res.slice(0, MAX_ITEMS);
 }
 
 /**
@@ -121,6 +127,7 @@ export function setupSearch(el, onPick) {
     if (!raw) { showError('請輸入股票代號或名稱，例如 2330 或 台積電。'); return; }
     if (active >= 0 && items[active]) { pick(items[active].code); return; }
     const up = raw.normalize('NFKC').toUpperCase();
+    if (INDEX_KEYS.some((k) => norm(k) === norm(raw))) { pick(INDEX_CODE); return; } // 大盤
     if (CODE_RE.test(up)) { pick(up); return; } // 代號直接查（清單裡沒有也試，可能是新上市）
     const found = searchStocks(raw);
     const exact = found.find((s) => norm(s.name) === norm(raw));

@@ -2,6 +2,7 @@
 
 import { GLOSSARY } from './glossary.js';
 import { shortDateLabel } from './dates.js';
+import { volUnit, volName, isIndexMode } from './units.js';
 
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const termBtn = (t) => (GLOSSARY[t] ? `<button type="button" class="term" data-term="${esc(t)}">${esc(t)}<span aria-hidden="true">?</span></button>` : '');
@@ -77,7 +78,7 @@ function toneOf(items) {
 export function buildCards(container) {
   container.innerHTML = CARDS.map((c) => `<section class="card state-card" data-card="${c.key}">
       <h3>${c.title}</h3>
-      ${c.indicators ? `<div class="ind-tabs" role="tablist">${IND_TABS.map((t) => `<button type="button" role="tab" data-ind="${t.type}"><i class="dot"></i>${t.label}</button>`).join('')}</div>
+      ${c.indicators ? `<div class="ind-tabs" role="tablist">${IND_TABS.map((t) => `<button type="button" role="tab" data-ind="${t.type}"><i class="dot"></i>${t.type === 'volume' ? volName() : t.label}</button>`).join('')}</div>
       <div class="ind-legend"></div><div class="ind-chart"></div>` : ''}
       <ul class="state-list"></ul>
       <div class="terms"></div>
@@ -105,7 +106,8 @@ export function updateCards(container, result, indType) {
       b.setAttribute('aria-selected', String(t === tab.type));
       b.querySelector('.dot').className = `dot ${toneOf(result.cards[t] || [])}`;
     });
-    sec.querySelector('.ind-legend').innerHTML = legendHtml(tab.legend);
+    const legend = tab.type === 'volume' ? [['紅綠柱', `每天${volName()}（${volUnit()}）`], tab.legend[1]] : tab.legend;
+    sec.querySelector('.ind-legend').innerHTML = legendHtml(legend);
     fillList(sec, result.cards[tab.type] || [], tab.type);
   }
 }
@@ -118,13 +120,13 @@ const signed = (n) => {
 
 export function renderChipsTable(container, chips, status) {
   const rows = [...chips].reverse();
-  const head = `<div class="panel-head">三大法人買賣超（張）${termBtn('三大法人')}${termBtn('買賣超')}</div>`;
+  const head = `<div class="panel-head">三大法人買賣超（${volUnit()}）${termBtn('三大法人')}${termBtn('買賣超')}</div>`;
   if (!status.ready) { container.innerHTML = head + `<div class="placeholder">${esc(status.message || '下載中…')}</div>`; return; }
   if (!rows.some((c) => c.inst)) { container.innerHTML = head + `<div class="placeholder">${esc(status.error ? `下載失敗：${status.error}` : '目前沒有法人資料。')}</div>`; return; }
   container.innerHTML = head + `<div class="card table-card"><table class="data-table">
     <thead><tr><th>日期</th><th>外資</th><th>投信</th><th>自營商</th><th>合計</th></tr></thead>
     <tbody>${rows.map((c) => `<tr><td>${shortDateLabel(c.date)}</td>${c.inst ? signed(c.inst.foreign) + signed(c.inst.trust) + signed(c.inst.dealer) + signed(c.inst.total) : '<td colspan="4" class="na">尚未公布</td>'}</tr>`).join('')}</tbody>
-  </table></div><p class="muted table-note">紅色是買超、綠色是賣超。1 張 = 1000 股。資料來源：證交所。</p>`;
+  </table></div><p class="muted table-note">紅色是買超、綠色是賣超。${isIndexMode() ? '大盤顯示的是三大法人對整個上市市場的買賣超金額。' : '1 張 = 1000 股。'}資料來源：證交所。</p>`;
 }
 
 export function renderMarginTable(container, chips, status) {

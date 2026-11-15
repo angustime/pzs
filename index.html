@@ -17,24 +17,31 @@
 </head>
 <body>
   <header class="search">
-    <div class="brand">盤後診股室</div>
+    <div class="brand-row"><div class="brand">盤後診股室</div><span id="appVersion" class="app-version">v1.0</span></div>
     <form id="searchForm" autocomplete="off">
       <input id="codeInput" type="text" enterkeyhint="search" autocomplete="off"
-             placeholder="代號或名稱，例如 2330、台積電" aria-label="股票代號或名稱" maxlength="20"
+             placeholder="代號或名稱，例如 2330、台積電、大盤" aria-label="股票代號或名稱" maxlength="20"
              role="combobox" aria-autocomplete="list" aria-controls="suggest" aria-expanded="false">
       <button type="submit">查詢</button>
     </form>
     <ul id="suggest" class="suggest" role="listbox" hidden></ul>
     <p id="inputError" class="input-error" hidden></p>
-    <div id="watchBar" class="watch-bar"></div>
+    <div class="sub-row">
+      <div id="watchBar" class="watch-bar"></div>
+      <button type="button" id="infoBtn" class="info-btn" data-info="menu" aria-label="選單">☰ 選單<i id="menuDot" class="menu-dot" hidden></i></button>
+    </div>
     <div id="watchPanel" class="watch-panel" hidden></div>
   </header>
 
   <main>
     <section id="welcome" class="welcome">
       <p>輸入上市股票代號，查看盤後技術面狀態。</p>
-      <p class="muted">只使用收盤後資料：每天下午三點後才會出現當天的資料。</p>
-      <p class="muted">查到股票後按「☆ 加入自選」，下次點搜尋框下方的「自選1」「自選2」就能直接調出。</p>
+      <p class="muted">只使用收盤後資料：收盤後證交所一公布，當天的價格就會出現；三大法人通常傍晚、融資融券通常晚上才公布。</p>
+      <p class="muted">查到股票後按「☆ 加入自選」，下次點搜尋框下方的「自選1」「自選2」就能直接調出。大盤（加權指數）已預先放在自選1。</p>
+      <div class="welcome-actions">
+        <button type="button" data-info="install">📲 加到手機主畫面</button>
+        <button type="button" data-info="about">ℹ️ 關於本 App</button>
+      </div>
     </section>
 
     <section id="status" class="status" hidden role="status" aria-live="polite"></section>
@@ -46,7 +53,7 @@
             <span id="stockName" class="stock-name"></span>
             <span id="stockCode" class="stock-code"></span>
             <span id="industry" class="industry"></span>
-            <span class="tag">上市</span>
+            <span id="marketTag" class="tag">上市</span>
             <div><button type="button" id="watchBtn" class="watch-btn" aria-pressed="false">☆ 加入自選</button></div>
           </div>
           <div class="price-box">
@@ -56,6 +63,7 @@
           </div>
         </div>
         <p id="asOf" class="as-of"></p>
+        <p id="checking" class="checking" hidden>正在檢查證交所是否有新資料…</p>
         <p id="staleWarn" class="stale" hidden></p>
 
         <div class="day-grid">
@@ -63,7 +71,7 @@
           <div><button type="button" class="lbl term-mini term" data-term="最高">最高<span aria-hidden="true">?</span></button><span id="dHigh" class="val"></span></div>
           <div><button type="button" class="lbl term-mini term" data-term="最低">最低<span aria-hidden="true">?</span></button><span id="dLow" class="val"></span></div>
           <div><button type="button" class="lbl term-mini term" data-term="參考價">參考價<span aria-hidden="true">?</span></button><span id="dRef" class="val"></span></div>
-          <div><button type="button" class="lbl term-mini term" data-term="成交量">成交量<span aria-hidden="true">?</span></button><span id="dVol" class="val vol"></span></div>
+          <div><button type="button" id="volLabel" class="lbl term-mini term" data-term="成交量">成交量<span aria-hidden="true">?</span></button><span id="dVol" class="val vol"></span></div>
           <div><button type="button" class="lbl term-mini term" data-term="振幅">振幅<span aria-hidden="true">?</span></button><span id="dAmp" class="val"></span></div>
         </div>
       </div>
@@ -112,6 +120,16 @@
       <p class="term-how"><b>怎麼看：</b><span id="termHow"></span></p>
       <p class="term-rule" hidden><b>本 App 怎麼判斷：</b><span id="termRule"></span></p>
       <button id="termClose" type="button">知道了</button>
+    </div>
+  </div>
+
+  <div id="infoSheet" class="sheet" hidden role="dialog" aria-modal="true" aria-label="說明">
+    <div class="sheet-body info-sheet">
+      <h3 class="menu-title">選單</h3>
+      <div id="installBody"></div>
+      <div id="storageBody"></div>
+      <div id="aboutBody"></div>
+      <button id="infoClose" type="button">關閉</button>
     </div>
   </div>
 

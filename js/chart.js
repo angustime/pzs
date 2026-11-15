@@ -6,6 +6,7 @@ import { CONFIG, RULES } from './config.js';
 import { sma, kd as calcKd, rsi as calcRsi, macd as calcMacd } from './indicators.js';
 import { refOf } from './price.js';
 import { shortDateLabel } from './dates.js';
+import { volOf, volUnit, fmtVol } from './units.js';
 
 const MA_COLORS = { 5: '#e0a106', 20: '#7b5cd6', 60: '#2f80c9' };
 
@@ -131,7 +132,7 @@ export function renderFull(container, legendEl, rows) {
   chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.78, bottom: 0 } });
   vol.setData(rows.map((r, i) => ({
     time: r.date,
-    value: Math.round(r.volume / 1000), // 張
+    value: Math.round(volOf(r)), // 張（大盤：億元）
     color: (i > 0 && r.close < rows[i - 1].close ? CONFIG.downColor : CONFIG.upColor) + '88',
   })));
 
@@ -151,7 +152,7 @@ export function renderFull(container, legendEl, rows) {
       .join(' ');
     legendEl.innerHTML =
       `<div><b>${r.date.slice(0, 4)}/${shortDateLabel(r.date)}</b>　收 <b class="${cls}">${r.close}</b> <span class="${cls}">${chgTxt}</span></div>` +
-      `<div>開 ${r.open}　高 ${r.high}　低 ${r.low}　量 ${Math.round(r.volume / 1000).toLocaleString()} 張</div>` +
+      `<div>開 ${r.open}　高 ${r.high}　低 ${r.low}　量 ${fmtVol(volOf(r))} ${volUnit()}</div>` +
       `<div>${ma}</div>`;
   }
   showLegend(rows.length - 1);
@@ -203,11 +204,11 @@ export function renderIndicator(container, rows, type) {
   if (type === 'volume') {
     const vol = chart.addHistogramSeries({ priceFormat: lotsFormat, priceLineVisible: false, lastValueVisible: false });
     vol.setData(rows.map((r, i) => ({
-      time: r.date, value: Math.round(r.volume / 1000),
+      time: r.date, value: Math.round(volOf(r)),
       color: i > 0 && r.close < rows[i - 1].close ? CONFIG.downColor : CONFIG.upColor,
     })));
     // 20 日均量（不含當天，和規則判定一致）
-    const lots = rows.map((r) => r.volume / 1000);
+    const lots = rows.map((r) => volOf(r));
     const avg = lots.map((_, i) => (i < RULES.volAvgDays ? null : lots.slice(i - RULES.volAvgDays, i).reduce((a, b) => a + b, 0) / RULES.volAvgDays));
     line(chart, MA_COLORS[5], { lastValueVisible: false, priceFormat: lotsFormat }).setData(pts(rows, avg));
     chart.priceScale('right').applyOptions({ scaleMargins: { top: 0.1, bottom: 0 } });

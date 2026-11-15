@@ -2,7 +2,8 @@
 // 證交所一次回一天「全部股票」，所以整天的資料精簡後存本機，換看別檔股票不用重抓。
 
 import { CONFIG } from './config.js';
-import { BASE, NO_DATA, throttledFetchJson, FetchError } from './twse.js';
+import { BASE, NO_DATA, throttledFetchJson, FetchError, fetchMarketInst } from './twse.js';
+import { isIndex } from './units.js';
 
 const PREFIX = 'twstock:v1:chips:';
 const num = (s) => {
@@ -22,7 +23,7 @@ function save(kind, date, value) {
 function prune(keepDates) {
   try {
     const keep = new Set();
-    for (const d of keepDates) { keep.add(PREFIX + 'T86:' + d); keep.add(PREFIX + 'MARGIN:' + d); }
+    for (const d of keepDates) { keep.add(PREFIX + 'T86:' + d); keep.add(PREFIX + 'MARGIN:' + d); keep.add(PREFIX + 'MKT:' + d); }
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
       if (k && k.startsWith(PREFIX) && !keep.has(k)) localStorage.removeItem(k);
@@ -74,7 +75,9 @@ async function fetchMargin(date) {
   return out;
 }
 
-const FETCHERS = { T86: fetchT86, MARGIN: fetchMargin };
+// MKT：全市場三大法人買賣金額（大盤用），存成 { TAIEX: [外資, 投信, 自營商, 合計] }（億元）
+const fetchMkt = async (date) => { const v = await fetchMarketInst(date); return v ? { TAIEX: v } : null; };
+const FETCHERS = { T86: fetchT86, MARGIN: fetchMargin, MKT: fetchMkt };
 
 /**
  * 確保指定交易日的法人與融資資料都在本機。
@@ -82,13 +85,14 @@ const FETCHERS = { T86: fetchT86, MARGIN: fetchMargin };
  * @param {(done:number,total:number)=>void} onProgress
  * @returns {Promise<{error: string|null}>}
  */
-export async function ensureChips(dates, onProgress = () => {}) {
+export async function ensureChips(dates, onProgress = () => {}, code = '') {
+  const kinds = isIndex(code) ? ['MKT'] : ['T86', 'MARGIN'];
   const now = Date.now();
-  const retryMs = CONFIG.chipsRetryMinutes * 60 * 1000;
+  const retryMs = CONFIG.recheckMinutes * 60 * 1000;
   const todo = [];
   // 新的日期先抓，萬一中途失敗，最近幾天至少有資料
   for (const d of [...dates].sort().reverse()) {
-    for (const kind of ['T86', 'MARGIN']) {
+    for (const kind of kinds) {
       const c = load(kind, d);
       if (c && c.found) continue;
       if (c && !c.found && now - c.fetchedAt < retryMs) continue; // 剛確認還沒公布，先不重試
@@ -118,7 +122,7 @@ export async function ensureChips(dates, onProgress = () => {}) {
  */
 export function readChips(code, dates) {
   return [...dates].sort().map((date) => {
-    const t = load('T86', date);
+    const t = load(isIndex(code) ? 'MKT' : 'T86', date);
     const m = load('MARGIN', date);
     const ti = t && t.found ? t.data[code] : undefined;
     const mi = m && m.found ? m.data[code] : undefined;

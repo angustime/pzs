@@ -1,18 +1,22 @@
 // 畫面主程式：查詢、顯示股價摘要與線圖、分頁切換。
 
-import { getStockData } from './data.js';
+import { getStockData, getCachedStockData } from './data.js';
+import { renderStorage, touchStock, deleteStockData, clearDownloaded, autoCleanup } from './storage.js';
 import { renderPreview, renderFull, renderTrend, renderIndicator } from './chart.js';
-import { CONFIG } from './config.js';
+import { CONFIG, APP_VERSION } from './config.js';
 import { shortDateLabel } from './dates.js';
 import { loadLastCode, saveLastCode } from './store.js';
 import { ensureChips, readChips } from './chips.js';
 import { evaluate } from './rules.js';
-import { renderMore } from './links.js';
+import { renderMore, renderInfo } from './links.js';
 import { refOf } from './price.js';
 import { initStockList, setupSearch, nameOf } from './search.js';
 import { setupWatchUI } from './watch-ui.js';
+import { seedIndexOnce } from './watchlist.js';
+import { INDEX_CODE, INDEX_NAME } from './units.js';
 import { INDUSTRY } from './industry.js';
 import { GLOSSARY } from './glossary.js';
+import { setMarketMode, isIndexMode, volOf, volUnit, volName, fmtVol } from './units.js';
 import { renderVerdict, buildCards, updateCards, renderChipsTable, renderMarginTable, setupGlossary } from './ui-state.js';
 
 const $ = (id) => document.getElementById(id);
@@ -50,11 +54,32 @@ const fmt = (n) => (Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(
 async function query(code) {
   const token = ++queryToken;
   el.welcome.hidden = true;
-  el.stock.hidden = true;
-  showStatus('準備查詢…');
+  const checking = $('checking');
 
-  const res = await getStockData(code, (msg) => { if (token === queryToken) showStatus(msg); });
+  // 1) 手機裡有資料就先秒開，再去問證交所有沒有新的一天
+  const cached = getCachedStockData(code);
+  if (cached) {
+    hideStatus();
+    show(code, cached);
+    if (!cached.needsCheck) { checking.hidden = true; loadChips(token); return; }
+    checking.hidden = false;
+  } else {
+    el.stock.hidden = true;
+    showStatus('準備查詢…');
+  }
+
+  // 2) 補抓缺的資料（證交所還沒公布就維持原本資料，畫面寫明資料日期）
+  const res = await getStockData(code, (msg) => { if (token === queryToken && !cached) showStatus(msg); });
   if (token !== queryToken) return;
+  checking.hidden = true;
+
+  if (cached) {
+    const changed = res.status === 'ok' && (res.stale || res.rows.length !== cached.rows.length
+      || res.rows.at(-1).date !== cached.rows.at(-1).date);
+    if (changed) show(code, res);
+    loadChips(token);
+    return;
+  }
 
   if (res.status === 'notfound') {
     showStatus(`查不到代號 ${code} 的資料。目前只支援上市股票（上櫃股票還不支援），請確認代號是否正確。`, true);
@@ -70,10 +95,16 @@ async function query(code) {
   }
 
   hideStatus();
-  saveLastCode(code);
-  current = { code, name: res.name || nameOf(code), rows: res.rows };
-  render(res);
+  show(code, res);
   loadChips(token);
+}
+
+function show(code, res) {
+  saveLastCode(code);
+  setMarketMode(code); // 個股或大盤：決定成交量單位與畫面用詞
+  current = { code, name: res.name || nameOf(code), rows: res.rows };
+  touchStock(code); // 記錄查看時間（自動清理用）
+  render(res);
 }
 
 // 籌碼資料在背景下載，下載完重新判定一次（股價先顯示，不讓使用者乾等）
@@ -88,7 +119,7 @@ async function loadChips(token) {
     const sec = Math.ceil(((total - done) * CONFIG.requestGapMs) / 1000);
     chipsStatus.message = `法人與融資資料下載中（${done}/${total}），約需 ${sec} 秒。下載過的日期換看別檔股票不用再等。`;
     renderAnalysis(false);
-  });
+  }, current.code);
   if (token !== queryToken) return;
   chipsStatus = { ready: true, message: null, error };
   renderAnalysis();
@@ -117,7 +148,8 @@ function renderAnalysis(full = true) {
   lastResult = result;
   updateCards(el.stateCards, result, indType);
   renderChipsTable(el.chipsPanel, chips, chipsStatus);
-  renderMarginTable(el.marginPanel, chips, chipsStatus);
+  if (isIndexMode()) el.marginPanel.innerHTML = '<div class="placeholder">大盤的融資融券（全市場融資餘額）目前還沒有提供，請查看個股。</div>';
+  else renderMarginTable(el.marginPanel, chips, chipsStatus);
 }
 
 function render(res) {
@@ -132,7 +164,11 @@ function render(res) {
   el.name.textContent = res.name || current.code;
   el.code.textContent = current.code;
   // 產業別（證交所官方分類，靜態資料）；ETF 等有名詞解釋的就做成可點的按鈕
-  const ind = INDUSTRY[current.code] || '';
+  const ind = isIndexMode() ? '加權指數' : INDUSTRY[current.code] || '';
+  $('marketTag').textContent = isIndexMode() ? '大盤' : '上市';
+  const vl = $('volLabel');
+  vl.dataset.term = volName();
+  vl.firstChild.textContent = volName();
   el.industry.innerHTML = '';
   if (ind && GLOSSARY[ind]) {
     const b = document.createElement('button');
@@ -178,7 +214,7 @@ function renderDayGrid(last, ref) {
   colored(el.dLow, last.low);
   el.dRef.textContent = fmt(ref);
   el.dRef.className = 'val';
-  el.dVol.textContent = Math.round(last.volume / 1000).toLocaleString() + ' 張';
+  el.dVol.textContent = `${fmtVol(volOf(last))} ${volUnit()}`;
   el.dAmp.textContent = (((last.high - last.low) / ref) * 100).toFixed(2) + '%';
 }
 
@@ -210,6 +246,36 @@ function closeFull(fromPopstate = false) {
 
 // ---- 事件 ----
 initStockList();
+// 「ⓘ 說明」與首頁按鈕：打開說明視窗（加到主畫面、關於本 App）
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-info]');
+  if (!b) return;
+  renderInfo($('installBody'), $('aboutBody'), b.dataset.info);
+  renderStorage($('storageBody'), current && current.code, b.dataset.info === 'storage');
+  // 第一次打開選單後，按鈕上的紅點就消失
+  try { localStorage.setItem(MENU_SEEN_KEY, '1'); } catch { /* 忽略 */ }
+  $('menuDot').hidden = true;
+  $('infoSheet').hidden = false;
+});
+// 儲存空間：刪除單檔、清除全部
+$('storageBody').addEventListener('click', (e) => {
+  const del = e.target.closest('[data-del-stock]');
+  if (del) { deleteStockData(del.dataset.delStock); renderStorage($('storageBody'), current && current.code, true); return; }
+  if (e.target.closest('[data-clear-all]')) {
+    if (!confirm('要清除全部下載的股價、法人、融資資料嗎？自選名單會保留，之後查詢會重新下載。')) return;
+    clearDownloaded();
+    renderStorage($('storageBody'), null, true);
+  }
+});
+autoCleanup();
+$('infoClose').addEventListener('click', () => { $('infoSheet').hidden = true; });
+$('infoSheet').addEventListener('click', (e) => { if (e.target.id === 'infoSheet') $('infoSheet').hidden = true; });
+
+$('appVersion').textContent = `v${APP_VERSION}`;
+// 選單按鈕的紅點：還沒打開過選單才顯示
+const MENU_SEEN_KEY = 'twstock:v1:menuSeen';
+try { $('menuDot').hidden = !!localStorage.getItem(MENU_SEEN_KEY); } catch { $('menuDot').hidden = true; }
+seedIndexOnce(INDEX_CODE, INDEX_NAME);
 // 自選名單（點自選股 = 一般查詢，會補抓最新資料）
 const watchUI = setupWatchUI(
   { bar: el.watchBar, panel: $('watchPanel'), sheet: $('watchSheet'), choices: $('watchChoices'), sheetClose: $('watchSheetClose'), starBtn: el.watchBtn },
